@@ -1,0 +1,133 @@
+1. POST /subscription-plans - Create new plan (Admin)
+
+{
+  "name": "Enterprise",
+  "description": "Perfect for large organizations with high search volume",
+  "price": 99.99,
+  "search_limit": 500,
+  "duration_days": 30,
+  "features": [
+    "500 searches per month",
+    "Priority support",
+    "Advanced analytics",
+    "API access",
+    "Custom integrations",
+    "Dedicated account manager"
+  ],
+  "is_popular": false,
+  "sort_order": 4
+}
+
+2. PUT /subscription-plans/:planId - Update plan (Admin)
+
+{
+  "name": "Enterprise Plus",
+  "description": "Enhanced enterprise plan with unlimited features",
+  "price": 149.99,
+  "search_limit": 1000,
+  "features": [
+    "1000 searches per month",
+    "24/7 priority support",
+    "Advanced analytics & reporting",
+    "Full API access",
+    "Custom integrations",
+    "Dedicated account manager",
+    "White-label options"
+  ],
+  "is_popular": true,
+  "is_active": true
+}
+
+3. POST /subscriptions/subscribe - Subscribe to a plan
+Exp 1 :
+{
+  "plan_id": 1,
+  "payment_method": "stripe",
+  "payment_token": "tok_1234567890abcdef",
+  "auto_renew": true
+}
+
+Exp 2:
+{
+  "plan_id": 2,
+  "payment_method": "paypal",
+  "auto_renew": false
+}
+
+4. POST /subscriptions/cancel - Cancel subscription
+
+{
+  "reason": "No longer need the service"
+}
+
+5. POST /subscriptions/change - Upgrade/Downgrade plan
+
+{
+  "new_plan_id": 3,
+  "payment_method": "stripe",
+  "payment_token": "tok_upgrade_123456"
+}
+
+6. POST /facebook/search - Search Facebook Ad Interests (Requires active subscription)
+
+{
+  "query": "booking",
+  "limit": 1000
+}
+
+Response:
+{
+  "message": "Ad interests retrieved successfully",
+  "status": 200,
+  "success": true,
+  "data": {
+    "query": "booking",
+    "total_results": 150,
+    "interests": [
+      {
+        "id": "6003107902433",
+        "name": "Booking.com",
+        "audience_size": 89000000,
+        "audience_size_lower_bound": 89000000,
+        "audience_size_upper_bound": 89000000,
+        "path": ["Business and industry", "Travel"],
+        "description": "Online travel booking platform",
+        "topic": "Travel"
+      }
+    ],
+    "paging": {
+      "cursors": {
+        "before": "...",
+        "after": "..."
+      }
+    }
+  }
+}
+
+7. GET /facebook/status - Check Facebook API Status (Public)
+
+Response:
+{
+  "status": 200,
+  "success": true,
+  "data": {
+    "configured": true,
+    "valid": true,
+    "app_id": "your_app_id",
+    "message": "Facebook API is working correctly"
+  }
+}
+
+8. POST /facebook/refresh-token - Manual Token Refresh (Admin only)
+
+Response:
+{
+  "message": "Token refreshed successfully",
+  "status": 200,
+  "success": true,
+  "data": {
+    "refreshed": true,
+    "expires_in": 5184000,
+    "message": "New token has been saved to environment"
+  }
+}

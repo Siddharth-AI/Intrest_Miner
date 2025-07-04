@@ -81,3 +81,5 @@ cert/
 # Ignore public folder
 public/
 backend/env.txt
+**/apiKey.ts
+**/secrets.ts

@@ -15,6 +15,8 @@ import LandingPageSections from "./pages/landing-page/LandingPageSections";
 import { Footer } from "./components/layout/Footer";
 import Login from "./pages/login/Login";
 import Register from "./pages/register/Register";
+import { store } from "../store/store";
+import { Provider } from "react-redux";
 
 const queryClient = new QueryClient();
 
@@ -40,30 +42,32 @@ const AuthLayout = () => (
 );
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          {/* Auth routes without header/footer */}
-          <Route element={<AuthLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/permium-miner" element={<Index />} />
-            <Route path="*" element={<NotFound />} />
-          </Route>
+  <Provider store={store}>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            {/* Auth routes without header/footer */}
+            <Route element={<AuthLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/permium-miner" element={<Index />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
 
-          {/* Main app routes with header/footer */}
-          <Route element={<MainLayout />}>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/" element={<LandingPageSections />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+            {/* Main app routes with header/footer */}
+            <Route element={<MainLayout />}>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/" element={<LandingPageSections />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </Provider>
 );
 
 export default App;

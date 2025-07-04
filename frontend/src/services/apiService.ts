@@ -23,7 +23,7 @@ export const generateInterestsWithGPT = async (formData: BusinessFormData): Prom
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`
         }
       }
     );
@@ -56,7 +56,7 @@ export const generateInterestsWithGPT = async (formData: BusinessFormData): Prom
 
 export const fetchInterestFromMeta = async (interest: string): Promise<MetaAPIResponse> => {
   try {
-    const url = `https://graph.facebook.com/v18.0/search?type=adinterest&q=${encodeURIComponent(interest)}&limit=1000&access_token=${process.env.FB_ACCESS_TOKEN}`;
+    const url = `https://graph.facebook.com/v18.0/search?type=adinterest&q=${encodeURIComponent(interest)}&limit=1000&access_token=${import.meta.env.VITE_FB_ACCESS_TOKEN}`;
     const response = await axios.get<MetaAPIResponse>(url);
     return response.data;
   } catch (error) {
@@ -114,7 +114,7 @@ IMPORTANT: You must return AT LEAST 15 top performing interests in your response
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`
         }
       }
     );

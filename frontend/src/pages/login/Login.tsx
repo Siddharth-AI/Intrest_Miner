@@ -4,133 +4,13 @@ import { Menu, Pickaxe, X } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-const Header = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
-    }
-    setIsMenuOpen(false);
-  };
-
-  return (
-    <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/20 bg-white">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#f1f5f9] to-[rgba(124,58,237,0.01)] shadow-lg" />
-      <nav className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
-        <div className="flex justify-between items-center h-[70px]">
-          {/* Brand */}
-          <Link to="/" className="flex items-center space-x-2">
-            <div className="flex items-center space-x-3">
-              <div
-                className="w-10 h-10 backdrop-blur-sm rounded-lg flex items-center justify-center border border-white/30"
-                style={{
-                  background: `linear-gradient(135deg, hsl(221.2, 83.2%, 53.3%) 0%, hsl(262.1, 83.3%, 57.8%) 100%)`,
-                }}>
-                <Pickaxe className="w-6 h-6 text-white rounded-lg" />
-              </div>
-              <span
-                className="text-2xl font-bold"
-                style={{
-                  background: `linear-gradient(135deg, hsl(221.2, 83.2%, 53.3%) 0%, hsl(262.1, 83.3%, 57.8%) 100%)`,
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}>
-                Interest-Miner
-              </span>
-            </div>
-          </Link>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            <button
-              onClick={() => scrollToSection("features")}
-              className="text-gray-500 hover:text-blue-400 transition-colors font-medium">
-              Features
-            </button>
-            <button
-              onClick={() => scrollToSection("pricing")}
-              className="text-gray-500 hover:text-blue-400 transition-colors font-medium">
-              Pricing
-            </button>
-            <button
-              onClick={() => scrollToSection("testimonials")}
-              className="text-gray-500 hover:text-blue-400 transition-colors font-medium">
-              Reviews
-            </button>
-            <a
-              href="/login"
-              className="text-gray-500 hover:text-blue-400 transition-colors">
-              <Button
-                className="bg-white/20 hover:bg-white/30 text-white border border-white/30 hover:border-white/50 backdrop-blur-sm hover:shadow-lg transition-all transform "
-                style={{
-                  background: `linear-gradient(135deg, hsl(221.2, 83.2%, 53.3%) 0%, hsl(262.1, 83.3%, 57.8%) 100%)`,
-                }}>
-                Start Free Trial
-              </Button>
-            </a>
-          </div>
-
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-2 text-white bg-blue-500 rounded-lg transition-colors"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}>
-            {isMenuOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
-            )}
-          </button>
-        </div>
-
-        {/* Mobile Menu */}
-        {isMenuOpen && (
-          <div className="md:hidden border-t border-white/20 py-4 space-y-4 bg-white backdrop-blur-sm rounded-b-lg mt-2">
-            <button
-              onClick={() => scrollToSection("features")}
-              className="block w-full text-left px-4 py-3 text-black/90 hover:text-blue-500 hover:bg-white/10 transition-colors rounded-lg mx-2">
-              Features
-            </button>
-            <button
-              onClick={() => scrollToSection("pricing")}
-              className="block w-full text-left px-4 py-3 text-black/90 hover:text-blue-500 hover:bg-white/10 transition-colors rounded-lg mx-2">
-              Pricing
-            </button>
-            <button
-              onClick={() => scrollToSection("testimonials")}
-              className="block w-full text-left px-4 py-3 text-black/90 hover:text-blue-500 hover:bg-white/10 transition-colors rounded-lg mx-2">
-              Reviews
-            </button>
-            <div className="px-4 space-y-3 pt-2">
-              <a href="/login" className="block">
-                <Button
-                  variant="ghost"
-                  className="w-full text-black/90 hover:text-blue-500 border border-white/30 hover:border-white/50">
-                  Sign In
-                </Button>
-              </a>
-              <a href="/login" className="block">
-                <Button className="w-full bg-white/20 hover:bg-white/30 text-black/90 border border-white/30 hover:border-white/50 backdrop-blur-sm">
-                  Start Free Trial
-                </Button>
-              </a>
-            </div>
-          </div>
-        )}
-      </nav>
-    </header>
-  );
-};
-
 const Login = () => {
   return (
     <>
       <div>
-        <Header />
-        <div className="flex-column items-center md:flex pt-28 pb-10 bg-gradient-to-br from-[#2d3748] to-[#3b82f6] overflow-hidden">
+        <div className="w-full md:items-center md:flex pt-28 pb-10 bg-gradient-to-br from-[#2d3748] to-[#3b82f6] overflow-hidden">
           {/* Left side content */}
-          <div className="left-div lg:ml-16">
+          <div className="hidden md:block left-div lg:ml-16">
             <div className="flex flex-col h-screen w-full justify-center p-8 text-[#f1f5f9] relative">
               <div className="circel-animation">
                 <span className="circle"></span>

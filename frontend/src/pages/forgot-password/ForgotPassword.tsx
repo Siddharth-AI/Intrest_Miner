@@ -1,10 +1,17 @@
+import ForgotPasswordForm from "@/components/ForgotPasswordForm";
 import RegisterForm from "@/components/RegisterForm";
-import { Button } from "@/components/ui/button";
+import VerifyOtpForm from "@/components/VerifyOtpForm";
+import ResetPasswordForm from "@/components/ResetPasswordForm";
 import { Menu, Pickaxe, X } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
-const Register = () => {
+const ForgotPassword = () => {
+  const [step, setStep] = useState<'email' | 'otp' | 'reset'>('email');
+  const [email, setEmail] = useState<string>("");
+  const [resetToken, setResetToken] = useState<string>("");
+  const navigate = useNavigate();
+
   return (
     <>
       <div>
@@ -112,11 +119,20 @@ const Register = () => {
               </div>
             </div>
           </div>
-          <RegisterForm />
+          {/* Stepper logic */}
+          {step === 'email' && (
+            <ForgotPasswordForm onOtpSent={(email) => { setEmail(email); setStep('otp'); }} />
+          )}
+          {step === 'otp' && (
+            <VerifyOtpForm email={email} onVerified={(token) => { setResetToken(token); setStep('reset'); }} />
+          )}
+          {step === 'reset' && (
+            <ResetPasswordForm resetToken={resetToken} onReset={() => navigate('/login')} />
+          )}
         </div>
       </div>
     </>
   );
 };
 
-export default Register;
+export default ForgotPassword;

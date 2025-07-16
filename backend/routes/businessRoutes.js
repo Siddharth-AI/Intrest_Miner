@@ -7,6 +7,7 @@ const {
 } = require("../middlewares/subscriptionMiddleware");
 const {
   validateBusinessInterest,
+   validateGetBusinessDetailsHistory,
 } = require("../middlewares/businessValidators");
 const {
   generateBusinessInterests,
@@ -14,6 +15,11 @@ const {
 const {
   storeFormDetails,
 } = require("../controllers/businessController");
+const {
+  getFormDetails,
+} = require("../controllers/businessController");
+
+
 // All routes require authentication and active subscription
 router.use(authenticateUser);
 
@@ -21,14 +27,17 @@ router.use(authenticateUser);
 router.post(
   "/generate-interests",
   validateBusinessInterest,
-  // checkSubscriptionLimits,
+  checkSubscriptionLimits,
   generateBusinessInterests,
   updateSearchUsage
-);
-router.post(
-  "/businesSearchistory",
-  storeFormDetails
+
 );
 
+router.post(
+  "/businesSearchistory",
+  validateBusinessInterest,
+  storeFormDetails
+);
+router.get("/business-details-history",validateGetBusinessDetailsHistory,getFormDetails)
 
 module.exports = router;

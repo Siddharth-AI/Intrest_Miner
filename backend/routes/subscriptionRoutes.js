@@ -8,6 +8,8 @@ const {
   getSubscriptionHistory,
   cancelSubscription,
   changeSubscription,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
 } = require("../controllers/subscriptionController");
 
 // All routes require authentication
@@ -19,5 +21,9 @@ router.get("/current", getCurrentSubscription);
 router.get("/history", getSubscriptionHistory);
 router.post("/cancel", cancelSubscription);
 router.post("/change", changeSubscription);
+
+// Razorpay payment routes
+router.post("/razorpay/order", createRazorpayOrder);
+router.post("/razorpay/verify", verifyRazorpayPayment);
 
 module.exports = router;

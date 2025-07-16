@@ -5,7 +5,7 @@ const subscriptionPlanSchema = require("../schema/subscriptionPlanSchema");
 const userSubscriptionSchema = require("../schema/userSubscriptionSchema");
 const paymentSchema = require("../schema/paymentSchema");
 const billingHistorySchema = require("../schema/billingHistorySchema");
-const businessDetailsHistorySchema = require("../schema/businessDetailsHIstorySchema")
+const businessDetailHistorySchema = require("../schema/businessDetailsHIstorySchema")
 const {
   initializeDefaultPlans,
 } = require("../controllers/subscriptionPlanController");
@@ -28,7 +28,7 @@ const dropTablesIfExists = async () => {
       "DROP TABLE IF EXISTS subscription_plans",
       "DROP TABLE IF EXISTS search_history",
       "DROP TABLE IF EXISTS users",
-      "DROP TABLE IF EXISTS business_details_history",
+      "DROP TABLE IF EXISTS business_detail_history",
     ];
 
     for (const query of dropQueries) {
@@ -82,7 +82,7 @@ const initializeDatabase = async (forceRecreate = false) => {
 
     await createTable(billingHistorySchema);
 
-    await createTable(businessDetailsHistorySchema);
+    await createTable(businessDetailHistorySchema);
     return true;
   } catch (error) {
     console.error("Database initialization error:");

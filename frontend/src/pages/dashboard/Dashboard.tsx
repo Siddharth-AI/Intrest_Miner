@@ -1,8 +1,18 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-
 import type React from "react";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 
+// Redux Imports // Adjust path to your store
+import {
+  searchFacebookInterests,
+  resetSearchState,
+  setCurrentPage,
+  setSelectedRows,
+  toggleRowSelection,
+} from "../../../store/features/facebookSearchSlice"; // Adjust path to your slice
+import { useAppSelector, useAppDispatch } from "../../../store/hooks"; // Adjust path to your hooks
 import {
   Search,
   X,
@@ -16,123 +26,77 @@ import {
   Users,
   Target,
 } from "lucide-react";
-import { useState, useEffect } from "react";
-// import { useRouter } from "next/navigation"
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { toast } from "@/hooks/use-toast";
 
-// Define types for the token data
-interface TokenData {
-  token: string;
-}
-
-// Import token data (you'll need to adjust this import path)
-import tokenData from "../../../automated/longToken.json";
-const accessToken = (tokenData as TokenData).token;
-// const accessToken = "your-access-token"; // Replace with your actual token
-
-// Define types for Facebook API response
-interface FacebookInterest {
-  id: string;
-  name: string;
-  audience_size_lower_bound: number;
-  audience_size_upper_bound: number;
-  path?: string[];
-  topic?: string;
-}
-
-interface FacebookResponse {
-  data: FacebookInterest[];
-  totalCount?: number;
-}
-
-// Define type for message state
 interface Message {
   type: "success" | "error";
   text: string;
 }
 
 export default function Dashboard() {
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [results, setResults] = useState<FacebookInterest[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [resultCount, setResultCount] = useState<number>(0);
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [message, setMessage] = useState<Message | null>(null);
-  const [hasSearched, setHasSearched] = useState<boolean>(false);
-  const router = useNavigate();
+  // Redux state - now includes selectedRows and currentPage
+  const dispatch = useAppDispatch();
+  const {
+    interests: results,
+    totalResults: resultCount,
+    status,
+    error,
+    selectedRows,
+    currentPage,
+  } = useAppSelector((state) => state.facebookSearch);
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  // REMOVED useState for selectedRows and currentPage
+
+  // Local state for UI messages
+  const [message, setMessage] = useState<Message | null>(null);
   const [itemsPerPage] = useState<number>(10);
 
+  const router = useNavigate();
+  const searchTermRef = useRef<HTMLInputElement>(null);
+
+  const isLoading = status === "loading";
+  const hasSearched = status === "succeeded" || status === "failed";
+
   useEffect(() => {
-    // Check authentication and get token
     const token = localStorage.getItem("token");
     if (!token) {
       router("/login");
-      return;
     }
-
-    const fetchData = async () => {
-      if (!searchQuery.trim()) return;
-
-      setLoading(true);
-      setError(null);
-      setHasSearched(true);
-      try {
-        const fbResponse = await fetch(
-          `https://graph.facebook.com/v18.0/search?type=adinterest&q=${encodeURIComponent(
-            searchQuery
-          )}&limit=1000&access_token=${accessToken}`
-        );
-
-        if (!fbResponse.ok) {
-          throw new Error("Failed to fetch Facebook data");
-        }
-
-        const fbData: FacebookResponse = await fbResponse.json();
-        setResults(fbData.data || []);
-        setResultCount(fbData.totalCount || fbData.data?.length || 0);
-        setCurrentPage(1);
-      } catch (err: any) {
-        setError(err.message || "Failed to fetch Facebook data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [searchQuery, router]);
+  }, [router]);
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSearchQuery(searchTerm);
+    const query = searchTermRef.current?.value || "";
+    if (!query.trim()) {
+      dispatch(resetSearchState()); // This now resets everything in Redux
+      if (searchTermRef.current) {
+        searchTermRef.current.value = "";
+      }
+      toast({
+        description: "Please enter a search term",
+        variant: "destructive",
+      });
+      return;
+    }
+    dispatch(searchFacebookInterests({ query, limit: 1000 }));
   };
 
+  // UPDATED: Handlers now dispatch Redux actions
   const handleClearSelection = () => {
-    setSelectedRows([]);
+    dispatch(setSelectedRows([]));
   };
 
   const handleSelectRow = (id: string) => {
-    if (selectedRows.includes(id)) {
-      setSelectedRows(selectedRows.filter((rowId) => rowId !== id));
-    } else {
-      setSelectedRows([...selectedRows, id]);
-    }
+    dispatch(toggleRowSelection(id));
   };
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      setSelectedRows(results.map((row) => row.id));
-    } else {
-      setSelectedRows([]);
-    }
+    const allIds = e.target.checked ? results.map((row) => row.id) : [];
+    dispatch(setSelectedRows(allIds));
   };
 
   const handleExport = () => {
+    // This logic remains the same as it reads from the Redux state
     const selectedItems = results.filter((item) =>
       selectedRows.includes(item.id)
     );
@@ -144,7 +108,6 @@ export default function Dashboard() {
       setTimeout(() => setMessage(null), 3000);
       return;
     }
-
     const headers = [
       "Name",
       "Audience Size Lower",
@@ -159,21 +122,20 @@ export default function Dashboard() {
       `"${item.path?.join(" > ") || ""}"`,
       `"${item.topic || ""}"`,
     ]);
-
     const csvContent = [headers, ...rows]
       .map((row) => row.join(","))
       .join("\n");
-
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `${searchQuery || "selected_interests"}.csv`);
+    link.setAttribute(
+      "download",
+      `${searchTermRef.current?.value || "selected_interests"}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
     setMessage({
       type: "success",
       text: `${selectedItems.length} items exported successfully`,
@@ -181,17 +143,26 @@ export default function Dashboard() {
     setTimeout(() => setMessage(null), 3000);
   };
 
-  const totalPages = Math.ceil(results.length / itemsPerPage);
+  const totalPages = Math.ceil(resultCount / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = results.slice(indexOfFirstItem, indexOfLastItem);
 
-  const nextPage = () =>
-    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
-  const prevPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
-  const firstPage = () => setCurrentPage(1);
-  const lastPage = () => setCurrentPage(totalPages);
+  // UPDATED: Pagination handlers now dispatch Redux actions
+  const nextPage = () => {
+    if (currentPage < totalPages) {
+      dispatch(setCurrentPage(currentPage + 1));
+    }
+  };
+  const prevPage = () => {
+    if (currentPage > 1) {
+      dispatch(setCurrentPage(currentPage - 1));
+    }
+  };
+  const firstPage = () => dispatch(setCurrentPage(1));
+  const lastPage = () => dispatch(setCurrentPage(totalPages));
 
+  // This function can stay as it is
   function formatAudienceSize(number: number): string {
     if (number >= 1_000_000_000) {
       return (number / 1_000_000_000).toFixed(1).replace(/\.0$/, "") + "B";
@@ -204,7 +175,6 @@ export default function Dashboard() {
     }
   }
 
-  // Empty state component, responsive
   const EmptyState = ({ type }: { type: string }) => {
     const isInitialLoad = type === "initial";
     const message = isInitialLoad
@@ -322,19 +292,10 @@ export default function Dashboard() {
                         />
                       </div>
                       <input
+                        ref={searchTermRef}
                         type="text"
                         className="w-full bg-transparent border-none text-[#111827] placeholder-[#2d3748] rounded-xl py-2 md:py-4 pl-10 md:pl-12 pr-2 md:pr-4 focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/50"
                         placeholder="Search for interests..."
-                        value={searchTerm}
-                        onChange={(e) => {
-                          setSearchTerm(e.target.value);
-                          setSelectedRows([]);
-                          if (e.target.value === "") {
-                            setHasSearched(false);
-                            setResults([]);
-                            setResultCount(0);
-                          }
-                        }}
                       />
                     </div>
                     <motion.button
@@ -403,7 +364,7 @@ export default function Dashboard() {
               </motion.div>
 
               {/* Table/Results Section */}
-              {loading ? (
+              {isLoading ? (
                 <motion.div
                   className="flex justify-center items-center py-16"
                   initial={{ opacity: 0 }}
@@ -427,7 +388,10 @@ export default function Dashboard() {
                       <input
                         type="checkbox"
                         onChange={handleSelectAll}
-                        checked={selectedRows.length === results.length}
+                        checked={
+                          results.length > 0 &&
+                          selectedRows.length === results.length
+                        }
                         className="h-5 w-5 rounded border-gray-300 focus:ring-[#3b82f6]"
                       />
                       <span className="ml-1 text-2xl md:text-base font-semibold text-[#111827]">
@@ -581,9 +545,7 @@ export default function Dashboard() {
             className="-z-10 absolute bottom-4 right-[33rem] w-32 h-32 bg-gradient-to-r from-black to-purple-600 rounded-full opacity-20 animate-float"
             style={{ animationDelay: "2s" }}></div>
           <div className="-z-10 absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-t from-purple-500 to-blue-300 rounded-full opacity-30 animate-float"></div>
-          {/* <div
-            className=" absolute top-0 left-0 w-64 h-64 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full opacity-20 animate-float"
-            style={{ animationDelay: "1s" }}></div> */}
+
           <div className="-z-10 absolute top-[20rem] left-[20rem] w-40 h-40 bg-gradient-to-b from-purple-600 to-blue-500 rounded-full opacity-30 animate-float"></div>
           <div className="-z-10 absolute top-[20rem] right-[10rem] w-36 h-36 bg-gradient-to-t from-blue-500 to-purple-400 rounded-full opacity-20 animate-float"></div>
         </div>

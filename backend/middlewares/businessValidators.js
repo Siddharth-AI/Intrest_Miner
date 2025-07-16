@@ -29,6 +29,34 @@ const businessInterestSchema = Joi.object({
     "any.required": "Contact email is required",
   }),
 });
+const GetBusinessDetailsHistory = Joi.object({
+  limit: Joi.number().integer().min(1).max(100).default(20),
+  offset: Joi.number().integer().min(0).default(0),
+  sort_by: Joi.string().valid("created_at", "last_visited", "visit_count", "raw_search_text").default("last_visited"),
+  sort_order: Joi.string().valid("asc", "desc", "ASC", "DESC").default("DESC"),
+  type: Joi.string().valid("text", "image", "video", "location", "other"),
+  category: Joi.string().max(100),
+  start_date: Joi.date().iso(),
+  end_date: Joi.date().iso().min(Joi.ref("start_date")),
+  search_term: Joi.string().min(1).max(255),
+  group_by: Joi.string().valid("date", "category", "type"),
+}).unknown(true)
+//
+const validateGetBusinessDetailsHistory = (req, res, next) => {
+  const { error, value } = GetBusinessDetailsHistory.validate(req.query)
+  if (error) {
+    return res.status(422).json({
+      message: error.details[0].message,
+      status: 422,
+      success: false,
+    })
+  }
+
+  // Use the validated values
+  req.query = value
+  next()
+}
+
 
 // Middleware function for validating business interest generation
 const validateBusinessInterest = (req, res, next) => {
@@ -46,4 +74,5 @@ const validateBusinessInterest = (req, res, next) => {
 
 module.exports = {
   validateBusinessInterest,
+  validateGetBusinessDetailsHistory,
 };

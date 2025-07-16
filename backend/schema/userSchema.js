@@ -3,6 +3,11 @@ const userSchema = `CREATE TABLE IF NOT EXISTS users (
   uuid varchar(255) NOT NULL UNIQUE,
   name varchar(100) NOT NULL,
   email varchar(100) NOT NULL UNIQUE,
+  contact varchar(20) DEFAULT NULL,
+  address varchar(255) DEFAULT NULL,
+  country varchar(100) DEFAULT NULL,
+  dob date DEFAULT NULL,
+  account_status ENUM('active','inactive','suspended') DEFAULT 'active',
   password varchar(255) NOT NULL,
   avatar_path varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   is_admin tinyint(1) NOT NULL DEFAULT '0',
@@ -23,3 +28,4 @@ const userSchema = `CREATE TABLE IF NOT EXISTS users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;`;
 
 module.exports = userSchema;
+

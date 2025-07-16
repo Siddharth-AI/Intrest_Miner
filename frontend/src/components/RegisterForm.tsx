@@ -1,12 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import type React from "react";
-
-import { useState } from "react";
+import React, { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 // import { useRouter } from "next/navigation";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "../../store/store";
+import { registerUser, resetRegistrationState } from "../../store/features/registrationSlice";
+import { toast } from "@/hooks/use-toast";
 
 interface FormData {
   name: string;
@@ -36,6 +38,8 @@ export default function RegisterForm() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   // const router = useRouter();
   const router = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
+  const registration = useSelector((state: RootState) => state.registration);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -84,46 +88,42 @@ export default function RegisterForm() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!validateForm()) return;
-
-    setIsLoading(true);
-    try {
-      const response = await fetch("http://localhost:1000/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          confirm_password: formData.confirmPassword,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        alert("Registration successful! Please login.");
-        router("/");
-      } else {
-        alert(data.message || "Registration failed. Please try again.");
-      }
-    } catch (error: any) {
-      console.error("Error during registration:", error);
-      alert("Something went wrong. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
+    dispatch(registerUser({
+      name: formData.name,
+      email: formData.email,
+      password: formData.password,
+      confirm_password: formData.confirmPassword,
+    }));
   };
+
+  // Show feedback based on registration state
+  React.useEffect(() => {
+    if (registration.success) {
+      toast({
+        title: "Registration Successful!",
+        description: registration.message || "Please login.",
+      });
+      dispatch(resetRegistrationState());
+      router("/");
+    } else if (registration.error) {
+      toast({
+        title: "Registration Failed",
+        description: registration.error,
+        variant: "destructive",
+      });
+      dispatch(resetRegistrationState());
+    }
+  }, [registration.success, registration.error]);
+
   return (
     <>
       {/* Right side form */}
-      <div className="w-full lg:w-[1000px]  flex items-center justify-center z-50 relative">
+      <div className="w-full lg:w-[1100px] flex items-center justify-center relative">
         {/* Decorative background elements */}
         <div className="absolute top-20 right-20 w-32 h-32 bg-purple-200/20 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-20 left-20 w-24 h-24 bg-blue-200/20 rounded-full blur-2xl animate-pulse delay-1000"></div>
 
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 w-[75%] shadow-2xl border border-white/20 relative overflow-hidden">
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 w-[90%] md:w-[75%] shadow-2xl border border-white/20 relative overflow-hidden">
           {/* Subtle gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-purple-50/30 to-blue-50/30 pointer-events-none"></div>
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 via-blue-500 to-indigo-500"></div>
@@ -362,36 +362,10 @@ export default function RegisterForm() {
               {/* Register Button */}
               <button
                 type="submit"
-                disabled={isLoading}
-                className={`w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 ${
-                  isLoading
-                    ? "opacity-70 cursor-not-allowed"
-                    : "hover:from-purple-700 hover:to-blue-700"
-                }`}>
-                {isLoading ? (
-                  <div className="flex items-center justify-center">
-                    <svg
-                      className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24">
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Registering...
-                  </div>
-                ) : (
-                  "Create Your Account"
-                )}
+                className="w-full py-3 mt-4 bg-purple-600 text-white rounded-full font-semibold shadow-lg hover:bg-purple-700 transition-all duration-200 disabled:opacity-60"
+                disabled={registration.loading}
+              >
+                {registration.loading ? "Registering..." : "Create Account"}
               </button>
 
               {/* Divider */}

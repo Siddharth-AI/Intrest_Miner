@@ -6,6 +6,7 @@ const { createTable, checkRecordExists, insertRecord, selectRecord, updateRecord
 const { customResponse } = require("../utils/customResponse");
 const crypto = require("crypto");
 const { sendOTPEmail, sendWelcomeEmail } = require("../utils/emailService");
+// const { getRecordByField } = require("../utils/profileHepler");
 
 const generateAccessToken = (payload) => {
     return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -188,8 +189,8 @@ const resetPassword = async (req, res) => {
         // Find user with valid reset token
         const user = await selectRecord(
             `SELECT * FROM users 
-       WHERE reset_token = ? AND otp_verified = 1 AND otp_expires_at > NOW() AND is_deleted = 0
-       LIMIT 1`,
+            WHERE reset_token = ? AND otp_verified = 1 AND otp_expires_at > NOW() AND is_deleted = 0
+            LIMIT 1`,
             [reset_token]
         );
 
@@ -223,6 +224,8 @@ const resetPassword = async (req, res) => {
         return customResponse("Failed to reset password", 500, false)(req, res);
     }
 };
+
+
 const logout = async (req, res) => {
     const authHeader = req.headers.authorization;
 
@@ -233,6 +236,118 @@ const logout = async (req, res) => {
     return res.status(200).json({ message: "Logged out successfully" });
 };
 
+//get profile
+const getProfile = async (req, res) => {
+    const uuid = req.user.uuid; // Assumes JWT middleware sets req.user
+
+    const query = `
+        SELECT JSON_OBJECT(
+        'uuid', u.uuid,
+        'name', u.name,
+        'email', u.email,
+        'contact', u.contact,
+        'address', u.address,
+        'country', u.country,
+        'dob', u.dob,
+        'account_status', u.account_status,
+        'avatar_path', u.avatar_path,
+        'created_at', u.created_at,
+        'updated_at', u.updated_at,
+        'end_date', us.end_date,
+        'current_plan', us.plan_id,
+        'subscription_status', us.status,
+        'open_Ai_searches', us.searches_used,
+        'open_Ai_total_searches', us.total,
+        'searches_remaining', us.searches_remaining,
+        'total_searches_made', COALESCE(sh.total_searches, 0),
+        'plan_details', JSON_OBJECT(
+            'id', p.id,
+            'name', p.name,
+            'price', p.price,
+            'duration_days', p.duration_days,
+            'search_limit', p.search_limit,
+            'features', p.features
+        )
+        ) AS profile
+        FROM users u
+        LEFT JOIN (
+        SELECT us1.*, us2.total
+        FROM user_subscriptions us1
+        INNER JOIN (
+            SELECT user_uuid, MAX(created_at) AS max_created_at, SUM(searches_used) AS total
+            FROM user_subscriptions
+            GROUP BY user_uuid
+        ) us2 ON us1.user_uuid = us2.user_uuid AND us1.created_at = us2.max_created_at
+        ) us ON u.uuid = us.user_uuid
+        LEFT JOIN subscription_plans p ON us.plan_id = p.id
+        LEFT JOIN (
+        SELECT user_uuid, COUNT(*) AS total_searches
+        FROM search_history
+        GROUP BY user_uuid
+        ) sh ON u.uuid = sh.user_uuid
+        WHERE u.uuid = ?
+        AND u.is_deleted = 0
+        LIMIT 1;
+    `
+
+    try {
+        // Pass uuid as parameter to the query
+        const results = await selectRecord(query, [uuid]);
+
+        if (!results || results.length === 0 || !results[0].profile) {
+            return res.status(404).json({
+                status: 404,
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        // Parse the JSON_OBJECT result
+        const profileData = JSON.parse(results[0].profile);
+
+        return res.status(200).json({
+            status: 200,
+            success: true,
+            data: profileData,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            status: 500,
+            success: false,
+            message: error.message,
+        });
+    }
+};
+
+// update profile
+
+const updateProfile = async (req, res) => {
+    try {
+        const userId = req.user.uuid; // ✅ Fixed here
+        const updateData = { ...req.body };
+
+        const existingUser = await checkRecordExists("users", "uuid", userId, "is_deleted = 0");
+        if (!existingUser) {
+            return customResponse("User not found", 404, false)(req, res);
+        }
+
+        // Check for duplicate contact number if updating contact
+        if (updateData.contact && updateData.contact !== existingUser.contact) {
+            const duplicateContact = await checkRecordExists("users", "contact", updateData.contact, "is_deleted = 0 AND uuid != ?", [userId]);
+            if (duplicateContact) {
+                return customResponse("Contact number already exists", 409, false)(req, res);
+            }
+        }
+
+        await updateRecord("users", updateData, "uuid", userId);
+
+        return customResponse("Profile updated successfully", 200, true)(req, res);
+    } catch (error) {
+        console.error("Update profile error:", error);
+        return customResponse("Failed to update profile", 500, false)(req, res);
+    }
+};
+
 module.exports = {
     register,
     login,
@@ -240,4 +355,6 @@ module.exports = {
     forgotPassword,
     verifyOtp,
     resetPassword,
+    updateProfile,
+    getProfile,
 };

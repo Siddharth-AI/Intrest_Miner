@@ -236,49 +236,49 @@ const getPaymentHistory = async (req, res) => {
   }
 }
 
-// Get spending summary
+// 
+
 const getSpendingSummary = async (req, res) => {
   try {
-    const user_uuid = req.user.uuid
-    const { period = "month" } = req.query // month, quarter, year
+    const user_uuid = req.user.uuid;
+    const { period = "month" } = req.query; // month, quarter, year
 
-    let dateFilter = ""
+    let dateFilter = "";
     switch (period) {
       case "month":
-        dateFilter = "AND bh.billing_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)"
-        break
+        dateFilter = "AND bh.billing_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)";
+        break;
       case "quarter":
-        dateFilter = "AND bh.billing_date >= DATE_SUB(NOW(), INTERVAL 3 MONTH)"
-        break
+        dateFilter = "AND bh.billing_date >= DATE_SUB(NOW(), INTERVAL 3 MONTH)";
+        break;
       case "year":
-        dateFilter = "AND bh.billing_date >= DATE_SUB(NOW(), INTERVAL 1 YEAR)"
-        break
+        dateFilter = "AND bh.billing_date >= DATE_SUB(NOW(), INTERVAL 1 YEAR)";
+        break;
     }
 
     const summaryQuery = `
       SELECT 
-        COUNT(*) as total_transactions,
-        SUM(amount) as total_spent,
-        AVG(amount) as average_transaction,
         billing_type,
-        COUNT(*) as type_count
-      FROM billing_history 
+        COUNT(*) as type_count,
+        SUM(amount) as total_spent,
+        AVG(amount) as average_transaction
+      FROM billing_history bh
       WHERE user_uuid = ? AND status = 'completed' ${dateFilter}
       GROUP BY billing_type
-    `
+    `;
 
-    const summary = await selectRecord(summaryQuery, [user_uuid])
+    const summary = await selectRecord(summaryQuery, [user_uuid]) || [];
 
     const totalQuery = `
       SELECT 
         COUNT(*) as total_transactions,
         SUM(amount) as total_spent,
         AVG(amount) as average_transaction
-      FROM billing_history 
+      FROM billing_history bh
       WHERE user_uuid = ? AND status = 'completed' ${dateFilter}
-    `
+    `;
 
-    const totals = await selectRecord(totalQuery, [user_uuid])
+    const totals = await selectRecord(totalQuery, [user_uuid]) || [];
 
     return res.status(200).json({
       status: 200,
@@ -288,12 +288,12 @@ const getSpendingSummary = async (req, res) => {
         totals: totals[0] || { total_transactions: 0, total_spent: 0, average_transaction: 0 },
         breakdown: summary,
       },
-    })
+    });
   } catch (error) {
-    console.error("Get spending summary error:", error)
-    return customResponse("Failed to fetch spending summary", 500, false)(req, res)
+    console.error("Get spending summary error:", error);
+    return customResponse("Failed to fetch spending summary", 500, false)(req, res);
   }
-}
+};
 
 module.exports = {
   getBillingHistory,

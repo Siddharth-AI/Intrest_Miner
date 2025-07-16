@@ -344,6 +344,7 @@ const HeroSection = () => {
               <motion.div
                 variants={fadeInUp}
                 className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-12">
+                <Link to="/login">
                 <Button
                   size="lg"
                   className="text-white hover:shadow-xl transition-all transform hover:scale-105 text-lg px-8 py-4"
@@ -353,6 +354,7 @@ const HeroSection = () => {
                   <Rocket className="w-5 h-5 mr-2" />
                   Start Free Trial
                 </Button>
+                  </Link>
                 <Button
                   variant="outline"
                   size="lg"
@@ -568,7 +570,7 @@ const FeaturesSection = () => {
   ];
 
   return (
-    <section className="py-20 bg-[#f1f5f9]">
+    <section className="py-20 bg-[#f1f5f9]" id="features">
       <div className="container mx-auto px-4">
         <motion.div
           ref={ref}
@@ -701,7 +703,7 @@ const TestimonialsSection = () => {
   ];
 
   return (
-    <section className="py-20 bg-[#f1f5f9]">
+    <section className="py-20 bg-[#f1f5f9]" id="testimonials">
       <div className="container mx-auto px-4">
         <motion.div
           ref={ref}
@@ -810,7 +812,7 @@ const SuccessStoriesSection = () => {
   ];
 
   return (
-    <section className="py-20 bg-gradient-to-br from-[#f1f5f9] to-[rgba(124,58,237,0.11)]">
+    <section className="py-20 bg-gradient-to-br from-[#f1f5f9] to-[rgba(124,58,237,0.11)]" id="growth">
       <div className="container mx-auto px-4">
         <motion.div
           ref={ref}
@@ -1112,7 +1114,6 @@ export {
 const LandingPageSections = () => {
   return (
     <>
-      <Header />
       <HeroSection />
       <FeaturesSection />
       <StatisticsSection />

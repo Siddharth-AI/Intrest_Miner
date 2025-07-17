@@ -1,146 +1,4 @@
-// import { useState } from "react";
-// import {
-//   Card,
-//   CardContent,
-//   CardDescription,
-//   CardHeader,
-//   CardTitle,
-// } from "@/components/ui/card";
-// import { Button } from "@/components/ui/button";
-// import { Sparkles, Target, BarChart3, Download } from "lucide-react";
-// import BusinessInfoForm from "@/components/BusinessInfoForm";
-// import InterestResults from "@/components/InterestResults";
-// import { BusinessFormData } from "@/types/business";
-
-// const Index = () => {
-//   const [currentStep, setCurrentStep] = useState(1);
-//   const [businessData, setBusinessData] = useState<BusinessFormData | null>(
-//     null
-//   );
-//   const [isProcessing, setIsProcessing] = useState(false);
-
-//   const handleFormSubmit = async (data: BusinessFormData) => {
-//     setBusinessData(data);
-//     setIsProcessing(true);
-
-//     // Move to the next step immediately to show the loading state in InterestResults component
-//     setCurrentStep(2);
-//   };
-
-//   const resetWorkflow = () => {
-//     setCurrentStep(1);
-//     setBusinessData(null);
-//     setIsProcessing(false);
-//   };
-
-//   return (
-//     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-//       {/* Header */}
-//       <div className="relative overflow-hidden">
-//         <div className="absolute inset-0 shadow-sm shadow-purple-900/55 backdrop-blur-sm mb-1"></div>
-//         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-6">
-//           <div className="text-center">
-//             <h1 className="text-5xl font-bold text-white mb-4 tracking-tight">
-//               <span className="bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-//                 IntrestMiner
-//               </span>
-//             </h1>
-//             <p className="text-xl text-blue-100 mb-8 max-w-3xl mx-auto">
-//               4-Step Automated Workflow to Generate High-Performing Meta Ad
-//               Interests
-//             </p>
-
-//             {/* Step Indicators */}
-//             <div className="flex justify-center items-center space-x-4 mb-12">
-//               {[
-//                 { step: 1, title: "Business Info", icon: Target },
-//                 { step: 2, title: "AI Analysis", icon: Sparkles },
-//                 { step: 3, title: "Meta API", icon: BarChart3 },
-//                 { step: 4, title: "Export Results", icon: Download },
-//               ].map(({ step, title, icon: Icon }) => (
-//                 <div key={step} className="flex items-center">
-//                   <div
-//                     className={`flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all duration-300 ${
-//                       currentStep >= step
-//                         ? "bg-purple-500 border-purple-400 text-white"
-//                         : "border-purple-300 text-purple-300"
-//                     }`}>
-//                     <Icon className="w-6 h-6" />
-//                   </div>
-//                   <span
-//                     className={`ml-2 text-sm font-medium transition-colors ${
-//                       currentStep >= step ? "text-white" : "text-purple-300"
-//                     }`}>
-//                     {title}
-//                   </span>
-//                   {step < 4 && (
-//                     <div
-//                       className={`ml-4 w-8 h-0.5 transition-colors ${
-//                         currentStep > step ? "bg-purple-400" : "bg-purple-600"
-//                       }`}
-//                     />
-//                   )}
-//                 </div>
-//               ))}
-//             </div>
-//           </div>
-//         </div>
-//       </div>
-
-//       {/* Main Content */}
-//       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-//         {currentStep === 1 && (
-//           <Card className="backdrop-blur-sm bg-white/10 border-white/20 shadow-2xl">
-//             <CardHeader className="text-center">
-//               <CardTitle className="text-2xl text-white">
-//                 Step 1: Gather Business Information
-//               </CardTitle>
-//               <CardDescription className="text-blue-100">
-//                 Tell us about your business to generate targeted interest
-//                 suggestions
-//               </CardDescription>
-//             </CardHeader>
-//             <CardContent>
-//               <BusinessInfoForm
-//                 onSubmit={handleFormSubmit}
-//                 isLoading={isProcessing}
-//               />
-//             </CardContent>
-//           </Card>
-//         )}
-
-//         {currentStep === 2 && businessData && (
-//           <div className="space-y-6">
-//             <Card className="backdrop-blur-sm bg-white/10 border-white/20 shadow-2xl">
-//               <CardHeader className="text-center">
-//                 <CardTitle className="text-2xl text-white">
-//                   Interest Analysis
-//                 </CardTitle>
-//                 <CardDescription className="text-blue-100">
-//                   Analyzing Meta ad interests for {businessData.productName}
-//                 </CardDescription>
-//               </CardHeader>
-//             </Card>
-
-//             <InterestResults businessData={businessData} />
-
-//             <div className="text-center">
-//               <Button
-//                 onClick={resetWorkflow}
-//                 variant="outline"
-//                 className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-//                 Start New Analysis
-//               </Button>
-//             </div>
-//           </div>
-//         )}
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default Index;
-
+// src/app/page.tsx (or Index.tsx)
 "use client";
 
 import { useState } from "react";
@@ -158,25 +16,29 @@ import InterestResults from "@/components/InterestResults";
 import type { BusinessFormData } from "@/types/business";
 import { motion } from "framer-motion";
 
+// Redux imports
+import { useAppSelector } from "../../store/hooks"; // Adjust path as needed
+
 const InterestGenerator = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [businessData, setBusinessData] = useState<BusinessFormData | null>(
     null
   );
-  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Use isLoading from Redux store
+  const { loading: isProcessing } = useAppSelector((state) => state.openai);
 
   const handleFormSubmit = async (data: BusinessFormData) => {
     setBusinessData(data);
-    setIsProcessing(true);
-
     // Move to the next step immediately to show the loading state in InterestResults component
     setCurrentStep(2);
+    // isProcessing will be true automatically when the generateInterests thunk is pending
   };
 
   const resetWorkflow = () => {
     setCurrentStep(1);
     setBusinessData(null);
-    setIsProcessing(false);
+    // isProcessing state will be reset by resetOpenAiState action in InterestResults
   };
 
   return (

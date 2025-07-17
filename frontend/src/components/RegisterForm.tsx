@@ -7,7 +7,10 @@ import { Link, useNavigate } from "react-router-dom";
 // import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
-import { registerUser, resetRegistrationState } from "../../store/features/registrationSlice";
+import {
+  registerUser,
+  resetRegistrationState,
+} from "../../store/features/registrationSlice";
 import { toast } from "@/hooks/use-toast";
 
 interface FormData {
@@ -88,12 +91,14 @@ export default function RegisterForm() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!validateForm()) return;
-    dispatch(registerUser({
-      name: formData.name,
-      email: formData.email,
-      password: formData.password,
-      confirm_password: formData.confirmPassword,
-    }));
+    dispatch(
+      registerUser({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        confirm_password: formData.confirmPassword,
+      })
+    );
   };
 
   // Show feedback based on registration state
@@ -104,7 +109,7 @@ export default function RegisterForm() {
         description: registration.message || "Please login.",
       });
       dispatch(resetRegistrationState());
-      router("/");
+      router("/login");
     } else if (registration.error) {
       toast({
         title: "Registration Failed",
@@ -363,8 +368,7 @@ export default function RegisterForm() {
               <button
                 type="submit"
                 className="w-full py-3 mt-4 bg-purple-600 text-white rounded-full font-semibold shadow-lg hover:bg-purple-700 transition-all duration-200 disabled:opacity-60"
-                disabled={registration.loading}
-              >
+                disabled={registration.loading}>
                 {registration.loading ? "Registering..." : "Create Account"}
               </button>
 

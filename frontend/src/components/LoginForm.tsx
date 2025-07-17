@@ -57,10 +57,12 @@ export default function LoginForm() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!validateForm()) return;
-    dispatch(loginUser({
-      email: formData.email,
-      password: formData.password,
-    }));
+    dispatch(
+      loginUser({
+        email: formData.email,
+        password: formData.password,
+      })
+    );
   };
 
   const handleSocialLogin = (provider: string) => {
@@ -242,8 +244,7 @@ export default function LoginForm() {
               <button
                 type="submit"
                 className="w-full py-3 mt-4 bg-purple-600 text-white rounded-full font-semibold shadow-lg hover:bg-purple-700 transition-all duration-200 disabled:opacity-60"
-                disabled={login.loading}
-              >
+                disabled={login.loading}>
                 {login.loading ? "Logging in..." : "Sign In"}
               </button>
 

@@ -1,3 +1,4 @@
+// src/components/InterestResults.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -26,18 +27,17 @@ import {
   Target,
   Loader,
 } from "lucide-react";
-import type {
-  BusinessFormData,
-  MetaInterest,
-  MetaRawInterest,
-} from "@/types/business";
+import type { BusinessFormData } from "@/types/business";
 import { useToast } from "@/hooks/use-toast";
-import {
-  generateInterestsWithGPT,
-  fetchInterestFromMeta,
-  analyzeInterestsWithGPT,
-} from "@/services/apiService";
 import { motion } from "framer-motion";
+
+// Redux imports
+import { useAppDispatch, useAppSelector } from "../../store/hooks"; // Adjust path as needed
+import {
+  generateInterests,
+  resetOpenAiState,
+  AnalyzedInterest,
+} from "../../store/features/openaiSlice"; // Adjust path as needed
 
 interface InterestResultsProps {
   businessData: BusinessFormData;
@@ -45,111 +45,81 @@ interface InterestResultsProps {
 
 const InterestResults = ({ businessData }: InterestResultsProps) => {
   const { toast } = useToast();
+  const dispatch = useAppDispatch();
+  const {
+    data: openAiData, // Use openAiData for the response
+    loading: isLoading,
+    error,
+  } = useAppSelector((state) => state.openai);
+
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
-  const [interests, setInterests] = useState<MetaInterest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // interests will now be derived from openAiData.analyzedInterests
   const [processingStep, setProcessingStep] = useState<string>(
     "Generating interests with AI..."
   );
-  const [progress, setProgress] = useState<number>(0);
+  const [progress, setProgress] = useState<number>(0); // This will be a mock progress as actual API doesn't provide it
 
   useEffect(() => {
     const fetchData = async () => {
-      try {
-        // Step 1: Generate interests with GPT
-        setProcessingStep("Generating interests with AI...");
-        const suggestedInterests = await generateInterestsWithGPT(businessData);
-        console.log("Suggested interests:", suggestedInterests);
+      // Reset state before new generation
+      dispatch(resetOpenAiState());
 
-        // Step 2: Query Meta Graph API for each interest without limiting results
-        setProcessingStep("Retrieving audience data from Meta...");
-        const rawInterests: MetaRawInterest[] = [];
-        let completedInterests = 0;
-
-        for (const interest of suggestedInterests) {
-          try {
-            const metaResult = await fetchInterestFromMeta(interest);
-            if (metaResult.data && metaResult.data.length > 0) {
-              // Process all Meta API results without limiting to top 3
-              metaResult.data.forEach((item) => {
-                rawInterests.push({
-                  name: item.name,
-                  audienceSizeLowerBound: item.audience_size_lower_bound,
-                  audienceSizeUpperBound: item.audience_size_upper_bound,
-                  path: item.path || [],
-                  topic: item.topic || "",
-                  category: item.disambiguation_category || "General Interest",
-                });
-              });
-            }
-          } catch (error) {
-            console.error(`Error processing interest "${interest}":`, error);
-          }
-
-          completedInterests++;
-          setProgress(
-            Math.round((completedInterests / suggestedInterests.length) * 100)
-          );
+      // Simulate progress for the UI
+      let currentProgress = 0;
+      const interval = setInterval(() => {
+        currentProgress += 10;
+        if (currentProgress <= 100) {
+          setProgress(currentProgress);
+          if (currentProgress === 30)
+            setProcessingStep("Retrieving audience data from Meta...");
+          if (currentProgress === 70)
+            setProcessingStep("Analyzing and ranking results with AI...");
+        } else {
+          clearInterval(interval);
         }
+      }, 300); // Update every 300ms
 
-        // Step 3: Analyze collected data with GPT
-        setProcessingStep("Analyzing and ranking results with AI...");
-        console.log("Raw interests collected:", rawInterests.length);
+      try {
+        const resultAction = await dispatch(generateInterests(businessData));
+        clearInterval(interval); // Clear interval once API call is done
+        setProgress(100); // Ensure progress is 100%
 
-        // If we have a lot of interests, send only a reasonable amount to GPT
-        const interestsToAnalyze =
-          rawInterests.length > 500 ? rawInterests.slice(0, 500) : rawInterests;
-
-        const analyzedInterests = await analyzeInterestsWithGPT(
-          businessData,
-          interestsToAnalyze
-        );
-
-        console.log("Final analyzed interests:", analyzedInterests);
-        setInterests(analyzedInterests);
-
-        // Step 4: Complete
-        setIsLoading(false);
-
+        if (generateInterests.fulfilled.match(resultAction)) {
+          // No need to setInterests here, as it will be derived from openAiData
+          toast({
+            title: "Analysis Complete",
+            description: `Found and analyzed ${resultAction.payload.analyzedInterests.length} potential Meta ad interests for your business.`,
+          });
+        } else if (generateInterests.rejected.match(resultAction)) {
+          toast({
+            title: "Error Analyzing Interests",
+            description:
+              (resultAction.payload as string) ||
+              "There was a problem processing your request. Please try again.",
+            variant: "destructive",
+          });
+          // Fallback to mock data on error if openAiData is null
+          // This part can be adjusted based on whether you always want mock data on API error
+          // For now, it will just show the error and not populate the table from mock.
+          // If you want mock data on error, you'd set openAiData in the slice's rejected case.
+        }
+      } catch (err) {
+        clearInterval(interval); // Ensure interval is cleared even if dispatch fails unexpectedly
+        console.error("Error dispatching generateInterests:", err);
         toast({
-          title: "Analysis Complete",
-          description: `Found and analyzed ${analyzedInterests.length} potential Meta ad interests for your business.`,
-        });
-      } catch (error) {
-        console.error("Error in data fetch workflow:", error);
-        setIsLoading(false);
-
-        toast({
-          title: "Error Analyzing Interests",
-          description:
-            "There was a problem processing your request. Please try again.",
+          title: "Error",
+          description: "An unexpected error occurred. Please try again.",
           variant: "destructive",
         });
-
-        // Set mock data as fallback
-        setInterests(getMockInterests());
+        // Fallback to mock data on unexpected error
       }
     };
 
     fetchData();
-  }, [businessData, toast]);
+  }, [businessData, dispatch, toast]);
 
-  const getMockInterests = (): MetaInterest[] => {
-    // Return mock data for fallback or testing
-    return [
-      {
-        name: "Programming",
-        audienceSizeLowerBound: 320000000,
-        audienceSizeUpperBound: 380000000,
-        path: ["Interests", "Technology", "Programming"],
-        topic: "Programming Language",
-        relevanceScore: 95,
-        category: "Skill-Based",
-        rank: 1,
-      },
-      // ... keep existing code for the mock interests
-    ];
-  };
+  // Derived state from Redux store
+  const interests = openAiData?.analyzedInterests || [];
 
   const formatAudienceSize = (lower: number, upper: number) => {
     const formatNumber = (num: number) => {
@@ -163,11 +133,11 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
 
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case "Skill-Based":
+      case "Technology":
         return "bg-[#3b82f6]/20 text-[#3b82f6] border-[#3b82f6]/30";
-      case "Career Intent":
+      case "Business and industry":
         return "bg-green-500/20 text-green-700 border-green-500/30";
-      case "Learning Platform":
+      case "Education":
         return "bg-[#2563eb]/20 text-[#2563eb] border-[#2563eb]/30";
       default:
         return "bg-[#2d3748]/20 text-[#2d3748] border-[#2d3748]/30";
@@ -267,6 +237,47 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
     );
   }
 
+  // If there's an error and no data, you might want to display an error message
+  if (error && !interests.length) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}>
+        <Card className="bg-red-50 border-red-200 shadow-lg">
+          <CardHeader className="text-center">
+            <CardTitle className="text-red-700">Error</CardTitle>
+            <CardDescription className="text-red-600">{error}</CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <Button onClick={() => dispatch(resetOpenAiState())}>
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  // If there's no data yet (e.g., initial load or after reset) and not loading
+  if (!openAiData && !isLoading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}>
+        <Card className="bg-[#f1f5f9] border-[#2d3748]/20 shadow-lg">
+          <CardContent className="p-8 text-center text-[#2d3748]">
+            <p>
+              No analysis results available yet. Please provide business
+              information to start.
+            </p>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       className="space-y-6"
@@ -308,11 +319,13 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                   <p className="text-sm font-medium text-[#2d3748]">
                     Avg. Audience Size
                   </p>
-                  <p className="text-2xl font-bold text-[#111827]">
-                    {formatAudienceSize(
-                      totalAudience / interests.length,
-                      totalAudience / interests.length
-                    )}
+                  <p className="text-xl font-bold text-[#111827]">
+                    {interests.length > 0
+                      ? formatAudienceSize(
+                          totalAudience / interests.length,
+                          totalAudience / interests.length
+                        )
+                      : "N/A"}
                   </p>
                 </div>
               </div>
@@ -333,7 +346,11 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                     Top Relevance Score
                   </p>
                   <p className="text-2xl font-bold text-[#111827]">
-                    {Math.max(...interests.map((i) => i.relevanceScore))}%
+                    {interests.length > 0
+                      ? `${Math.max(
+                          ...interests.map((i) => i.relevanceScore)
+                        )}%`
+                      : "N/A"}
                   </p>
                 </div>
               </div>
@@ -361,7 +378,9 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
               </div>
               <Button
                 onClick={handleExportCSV}
-                className="bg-green-600 hover:bg-green-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200">
+                className="bg-green-600 hover:bg-green-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                disabled={interests.length === 0} // Disable if no interests
+              >
                 <Download className="w-4 h-4 mr-2" />
                 Export CSV
               </Button>
@@ -393,65 +412,79 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {interests.map((interest) => (
-                    <TableRow
-                      key={interest.name}
-                      className="border-[#2d3748]/20 hover:bg-[#3b82f6]/5 cursor-pointer transition-colors"
-                      onClick={() => toggleInterestSelection(interest.name)}>
-                      <TableCell className="text-[#111827] font-medium">
-                        <div className="flex items-center">
-                          #{interest.rank}
-                          {interest.rank <= 3 && (
-                            <Star className="w-4 h-4 text-amber-500 ml-1" />
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-[#111827] font-medium">
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={selectedInterests.includes(interest.name)}
-                            onChange={() =>
-                              toggleInterestSelection(interest.name)
-                            }
-                            className="mr-2 accent-[#3b82f6]"
-                          />
-                          {interest.name}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-[#2d3748]">
-                        {formatAudienceSize(
-                          interest.audienceSizeLowerBound,
-                          interest.audienceSizeUpperBound
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                          <div className="w-12 bg-[#2d3748]/20 rounded-full h-2 mr-2">
-                            <div
-                              className="bg-gradient-to-r from-[#3b82f6] to-[#2563eb] h-2 rounded-full transition-all duration-300"
-                              style={{
-                                width: `${interest.relevanceScore}%`,
-                              }}></div>
+                  {interests.length > 0 ? (
+                    interests.map((interest) => (
+                      <TableRow
+                        key={interest.name}
+                        className="border-[#2d3748]/20 hover:bg-[#3b82f6]/5 cursor-pointer transition-colors"
+                        onClick={() => toggleInterestSelection(interest.name)}>
+                        <TableCell className="text-[#111827] font-medium">
+                          <div className="flex items-center">
+                            #{interest.rank}
+                            {interest.rank <= 3 && (
+                              <Star className="w-4 h-4 text-amber-500 ml-1" />
+                            )}
                           </div>
-                          <span className="text-[#111827] font-medium">
-                            {interest.relevanceScore}%
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={`${getCategoryColor(
-                            interest.category
-                          )} rounded-lg`}>
-                          {interest.category}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-[#2d3748]">
-                        {interest.topic}
+                        </TableCell>
+                        <TableCell className="text-[#111827] font-medium">
+                          <div className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedInterests.includes(
+                                interest.name
+                              )}
+                              onChange={() =>
+                                toggleInterestSelection(interest.name)
+                              }
+                              className="mr-2 accent-[#3b82f6]"
+                            />
+                            {interest.name}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-[#2d3748]">
+                          {formatAudienceSize(
+                            interest.audienceSizeLowerBound,
+                            interest.audienceSizeUpperBound
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center">
+                            <div className="w-12 bg-[#2d3748]/20 rounded-full h-2 mr-2">
+                              <div
+                                className="bg-gradient-to-r from-[#3b82f6] to-[#2563eb] h-2 rounded-full transition-all duration-300"
+                                style={{
+                                  width: `${interest.relevanceScore}%`,
+                                }}></div>
+                            </div>
+                            <span className="text-[#111827] font-medium">
+                              {interest.relevanceScore}%
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={`${getCategoryColor(
+                              interest.category
+                            )} rounded-lg`}>
+                            {interest.category}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-[#2d3748]">
+                          {interest.topic}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="text-center text-[#2d3748] py-8">
+                        {error
+                          ? "Failed to load interests."
+                          : "No interests found for your business data yet."}
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </div>

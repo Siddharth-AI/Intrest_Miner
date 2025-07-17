@@ -11,7 +11,7 @@ import {
   setCurrentPage,
   setSelectedRows,
   toggleRowSelection,
-} from "../../../store/features/facebookSearchSlice"; // Adjust path to your slice
+} from "../../../store/features/facebookSlice"; // Adjust path to your slice
 import { useAppSelector, useAppDispatch } from "../../../store/hooks"; // Adjust path to your hooks
 import {
   Search,
@@ -27,13 +27,15 @@ import {
   Target,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { fetchProfileData } from "../../../store/features/profileSlice";
 
 interface Message {
   type: "success" | "error";
   text: string;
 }
 
-export default function Dashboard() {
+export default function App() {
+  // Renamed to App for React immersive compatibility
   // Redux state - now includes selectedRows and currentPage
   const dispatch = useAppDispatch();
   const {
@@ -45,8 +47,9 @@ export default function Dashboard() {
     currentPage,
   } = useAppSelector((state) => state.facebookSearch);
 
-  // REMOVED useState for selectedRows and currentPage
-
+  useEffect(() => {
+    dispatch(fetchProfileData());
+  }, []);
   // Local state for UI messages
   const [message, setMessage] = useState<Message | null>(null);
   const [itemsPerPage] = useState<number>(10);
@@ -64,7 +67,7 @@ export default function Dashboard() {
     }
   }, [router]);
 
-  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSearch = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const query = searchTermRef.current?.value || "";
     if (!query.trim()) {
@@ -78,6 +81,45 @@ export default function Dashboard() {
       });
       return;
     }
+
+    // --- API Call for Search History ---
+    try {
+      const accessToken = localStorage.getItem("token"); // Get access token from localStorage
+      if (!accessToken) {
+        console.log("token no found");
+      }
+
+      const response = await fetch("http://localhost:1000/search-history/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`, // Include access token in header
+        },
+        body: JSON.stringify({ search_text: query }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Failed to store search history:", errorData);
+        // Optionally, show a toast or message to the user about the API call failure
+        toast({
+          description: "Failed to save search history.",
+          variant: "destructive",
+        });
+      } else {
+        const successData = await response.json();
+        console.log("Search history stored successfully:", successData);
+        // No UI update needed as per requirement, just logging for verification
+      }
+    } catch (apiError) {
+      console.error("Error calling search history API:", apiError);
+      toast({
+        description: "Network error while saving search history.",
+        variant: "destructive",
+      });
+    }
+    // --- End of API Call for Search History ---
+
     dispatch(searchFacebookInterests({ query, limit: 1000 }));
   };
 

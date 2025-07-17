@@ -35,7 +35,7 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
     contactEmail: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate form
@@ -50,6 +50,46 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
       });
       return;
     }
+
+    // --- API Call for Business Search History ---
+    try {
+      const accessToken = localStorage.getItem("token"); // Get access token from localStorage
+      if (!accessToken) {
+        console.log("token not found");
+      }
+      const response = await fetch(
+        "http://localhost:1000/business/businesSearchistory",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(formData), // Sending the entire formData object
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.log("Failed to store business form data:", errorData);
+        // Optionally, show a toast or message to the user about the API call failure
+        toast({
+          description: "Failed to save business information.",
+          variant: "destructive",
+        });
+      } else {
+        const successData = await response.json();
+        console.log("Business form data stored successfully:", successData);
+        // No UI update needed as per requirement, just logging for verification
+      }
+    } catch (apiError) {
+      console.error("Error calling business search history API:", apiError);
+      toast({
+        description: "Network error while saving business information.",
+        variant: "destructive",
+      });
+    }
+    // --- End of API Call for Business Search History ---
 
     onSubmit(formData);
   };

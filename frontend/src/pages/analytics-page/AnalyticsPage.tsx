@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // pages/analytics-page/AnalyticsPage.tsx
+
 import React, { useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -81,30 +82,34 @@ import {
   setShowModal,
   setShowCustomDatePicker,
   setSelectedCampaignForModal,
-  resetFilters,
-  clearError,
+  setShowAnalyticsModal,
+  setAnalysisResults,
 } from "../../../store/features/facebookAdsSlice";
 import CampaignModal from "@/components/model/CampaignModal";
+import AnalyticsModal from "@/components/model/AnalyticsModal";
+import {
+  analyzeAllCampaigns,
+  getHistoricalTrend,
+  predictFuturePerformance,
+} from "../../lib/analyticsService";
 
-// Enhanced date filter options
 const dateFilterOptions = [
-  { value: "today", label: "Today", icon: "📅" },
-  { value: "yesterday", label: "Yesterday", icon: "📆" },
-  { value: "last_7d", label: "Last 7 Days", icon: "📊" },
-  { value: "last_14d", label: "Last 14 Days", icon: "📈" },
-  { value: "last_30d", label: "Last 30 Days", icon: "📉" },
-  { value: "this_month", label: "This Month", icon: "🗓️" },
-  { value: "last_month", label: "Last Month", icon: "📋" },
-  { value: "last_90d", label: "Last 3 Months", icon: "📊" },
-  { value: "this_quarter", label: "This Quarter", icon: "📈" },
-  { value: "last_quarter", label: "Last Quarter", icon: "📉" },
-  { value: "this_year", label: "This Year", icon: "🗓️" },
-  { value: "last_year", label: "Last Year", icon: "📅" },
-  { value: "maximum", label: "All Time", icon: "♾️" },
-  { value: "custom", label: "Custom Range", icon: "🎯" },
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "last_7d", label: "Last 7 Days" },
+  { value: "last_14d", label: "Last 14 Days" },
+  { value: "last_30d", label: "Last 30 Days" },
+  { value: "this_month", label: "This Month" },
+  { value: "last_month", label: "Last Month" },
+  { value: "last_90d", label: "Last 3 Months" },
+  { value: "this_quarter", label: "This Quarter" },
+  { value: "last_quarter", label: "Last Quarter" },
+  { value: "this_year", label: "This Year" },
+  { value: "last_year", label: "Last Year" },
+  { value: "maximum", label: "All Time" },
+  { value: "custom", label: "Custom Range" },
 ];
 
-// Chart colors for better visualization
 const CHART_COLORS = {
   primary: "#3B82F6",
   secondary: "#10B981",
@@ -120,7 +125,6 @@ const AnalyticsPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const { toast } = useToast();
 
-  // Redux state
   const {
     adAccounts,
     campaigns,
@@ -138,7 +142,6 @@ const AnalyticsPage: React.FC = () => {
     lastUpdated,
   } = useAppSelector((state) => state.facebookAds);
 
-  // Theme detection
   const [isDarkMode, setIsDarkMode] = React.useState(false);
 
   useEffect(() => {
@@ -155,7 +158,6 @@ const AnalyticsPage: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Filter campaigns based on search and status
   const filteredCampaigns = useMemo(() => {
     let filtered = campaigns;
 
@@ -177,26 +179,22 @@ const AnalyticsPage: React.FC = () => {
     return filtered;
   }, [campaigns, searchTerm, statusFilter]);
 
-  // Initialize data
   useEffect(() => {
     dispatch(fetchAdAccounts());
   }, [dispatch]);
 
-  // Fetch campaigns when account changes
   useEffect(() => {
     if (selectedAccount) {
       dispatch(fetchCampaigns(selectedAccount));
     }
   }, [selectedAccount, dispatch]);
 
-  // Fetch insights when filters change
   useEffect(() => {
     if (selectedAccount) {
       dispatch(fetchInsights());
     }
   }, [selectedAccount, dateFilter, customDateRange, dispatch]);
 
-  // Handle errors
   useEffect(() => {
     if (error) {
       toast({
@@ -204,11 +202,11 @@ const AnalyticsPage: React.FC = () => {
         description: error,
         variant: "destructive",
       });
-      dispatch(clearError());
+      // Assuming you have a `clearError` action
+      // dispatch(clearError());
     }
   }, [error, toast, dispatch]);
 
-  // Event handlers
   const handleAccountChange = (accountId: string) => {
     dispatch(setSelectedAccount(accountId));
   };
@@ -246,7 +244,36 @@ const AnalyticsPage: React.FC = () => {
     dispatch(setShowModal(true));
   };
 
-  // Utility functions
+  const runAnalysis = () => {
+    if (campaigns.length > 0 && insights.length > 0) {
+      const campaignAnalyses = analyzeAllCampaigns(campaigns, insights);
+      const historicalTrend = getHistoricalTrend(insights);
+      const futurePrediction = predictFuturePerformance(historicalTrend);
+
+      dispatch(
+        setAnalysisResults({
+          campaignAnalyses,
+          historicalTrend,
+          futurePrediction,
+        })
+      );
+
+      dispatch(setShowAnalyticsModal(true));
+
+      toast({
+        title: "Analysis Complete",
+        description: "Your campaign performance analysis is ready.",
+      });
+    } else {
+      toast({
+        title: "Not Enough Data",
+        description:
+          "We need more campaign and insight data to run an analysis.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getAccessToken = () => localStorage.getItem("FB_ACCESS_TOKEN");
 
   const getStatusBadge = (status: string) => {
@@ -288,6 +315,7 @@ const AnalyticsPage: React.FC = () => {
       maximumFractionDigits: 2,
     }).format(amount);
   };
+
   const formatNumber = (num: number) => {
     if (num >= 1000000) {
       return (num / 1000000).toFixed(1) + "M";
@@ -297,7 +325,6 @@ const AnalyticsPage: React.FC = () => {
     return new Intl.NumberFormat("en-IN").format(num);
   };
 
-  // Chart data preparation
   const prepareChartData = () => {
     const campaignData = campaigns
       .map((campaign) => {
@@ -373,7 +400,6 @@ const AnalyticsPage: React.FC = () => {
   const chartData = prepareChartData();
   const spendOverTimeData = prepareSpendOverTime();
 
-  // Empty states component
   const EmptyState = ({
     icon: Icon,
     title,
@@ -402,7 +428,6 @@ const AnalyticsPage: React.FC = () => {
     </motion.div>
   );
 
-  // Loading state
   if (initialLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-white to-gray-100 dark:from-gray-950 dark:to-gray-900 flex items-center justify-center">
@@ -421,7 +446,6 @@ const AnalyticsPage: React.FC = () => {
     );
   }
 
-  // No access token state
   if (!getAccessToken()) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-white to-gray-100 dark:from-gray-950 dark:to-gray-900 p-6">
@@ -444,7 +468,6 @@ const AnalyticsPage: React.FC = () => {
     );
   }
 
-  // No ad accounts state
   if (adAccounts.length === 0 && !loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-white to-gray-100 dark:from-gray-950 dark:to-gray-900 p-6">
@@ -475,7 +498,6 @@ const AnalyticsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-gray-100 dark:from-gray-950 dark:to-gray-900">
       <div className="max-w-7xl mx-auto p-6 space-y-8">
-        {/* Page Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -499,9 +521,7 @@ const AnalyticsPage: React.FC = () => {
               </p>
             </div>
           </div>
-          {/* Filter Bar */}
-          <div className="flex flex-col sm:flex-row gap-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm p-4">
-            {/* Date Filter */}
+          <div className="flex flex-col flex-wrap sm:flex-row gap-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm p-4">
             <Select value={dateFilter} onValueChange={handleDateFilterChange}>
               <SelectTrigger className="w-full sm:w-56 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-300 dark:hover:border-blue-300 shadow transition focus:ring-2 focus:ring-blue-400">
                 <Calendar className="h-5 w-5 mr-2 text-blue-500" />
@@ -513,15 +533,13 @@ const AnalyticsPage: React.FC = () => {
                     key={option.value}
                     value={option.value}
                     className="flex items-center px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900/30 focus:bg-blue-100 dark:focus:bg-blue-900/40 cursor-pointer rounded transition">
-                    <span className="mr-3 text-lg">{option.icon}</span>
-                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                    <span className="ml-8 font-medium text-gray-900 dark:text-gray-100">
                       {option.label}
                     </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {/* Custom Date Range popover */}
             {dateFilter === "custom" && (
               <Popover
                 open={showCustomDatePicker}
@@ -606,7 +624,6 @@ const AnalyticsPage: React.FC = () => {
                 </PopoverContent>
               </Popover>
             )}
-            {/* Account Selector */}
             <Select value={selectedAccount} onValueChange={handleAccountChange}>
               <SelectTrigger className="w-full sm:w-72 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg shadow hover:border-blue-500 dark:hover:border-blue-300 focus:ring-2 focus:ring-blue-400">
                 <Users className="h-5 w-5 mr-2 text-blue-500" />
@@ -618,7 +635,7 @@ const AnalyticsPage: React.FC = () => {
                     key={account.id}
                     value={account.id}
                     className="px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900/30 focus:bg-blue-100 dark:focus:bg-blue-900/40 cursor-pointer rounded flex items-center justify-between">
-                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                    <span className=" ml-8 font-medium text-gray-900 dark:text-gray-100">
                       {account.name}
                     </span>
                     <Badge
@@ -630,7 +647,6 @@ const AnalyticsPage: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
-            {/* Refresh Button */}
             <Button
               onClick={() => dispatch(fetchAdAccounts())}
               disabled={loading}
@@ -642,10 +658,16 @@ const AnalyticsPage: React.FC = () => {
               )}
               {loading ? "Refreshing..." : "Refresh"}
             </Button>
+            <Button
+              onClick={runAnalysis}
+              disabled={loading}
+              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-lg shadow-lg px-6 py-2 transition active:scale-95">
+              <Zap className="h-5 w-5 mr-2" />
+              Analyze Performance
+            </Button>
           </div>
         </motion.div>
 
-        {/* Stats Cards */}
         {aggregatedStats ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
@@ -767,10 +789,8 @@ const AnalyticsPage: React.FC = () => {
           </div>
         ) : null}
 
-        {/* Chart Section */}
         {chartData.length > 0 && spendOverTimeData.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Spend Over Time Chart */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -861,7 +881,7 @@ const AnalyticsPage: React.FC = () => {
                           stroke={CHART_COLORS.primary}
                           fillOpacity={1}
                           fill="url(#spendGradient)"
-                          name="Spend (₹)"
+                          name="Spend (â‚¹)"
                           strokeWidth={2}
                         />
                         <Area
@@ -880,7 +900,6 @@ const AnalyticsPage: React.FC = () => {
               </Card>
             </motion.div>
 
-            {/* Campaign Performance Chart */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -925,7 +944,7 @@ const AnalyticsPage: React.FC = () => {
                             boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                           }}
                           formatter={(value, name) => {
-                            if (name === "Spend (₹)")
+                            if (name === "Spend (â‚¹)")
                               return [formatCurrency(Number(value)), name];
                             return [formatNumber(Number(value)), name];
                           }}
@@ -940,7 +959,7 @@ const AnalyticsPage: React.FC = () => {
                         <Bar
                           dataKey="spend"
                           fill={CHART_COLORS.tertiary}
-                          name="Spend (₹)"
+                          name="Spend (â‚¹)"
                           radius={[4, 4, 0, 0]}
                         />
                         <Bar
@@ -958,7 +977,6 @@ const AnalyticsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Campaigns Table */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -974,12 +992,11 @@ const AnalyticsPage: React.FC = () => {
                     Campaigns Overview
                   </CardTitle>
                   <CardDescription>
-                    {campaigns.length} campaigns • {filteredCampaigns.length}{" "}
-                    shown • {insights.length} insights
+                    {campaigns.length} campaigns â€¢ {filteredCampaigns.length}{" "}
+                    shown â€¢ {insights.length} insights
                   </CardDescription>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  {/* Search */}
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
@@ -989,7 +1006,6 @@ const AnalyticsPage: React.FC = () => {
                       className="pl-10 w-full sm:w-64 bg-gray-50 dark:bg-gray-700"
                     />
                   </div>
-                  {/* Status Filter */}
                   <Select
                     value={statusFilter}
                     onValueChange={(value) => dispatch(setStatusFilter(value))}>
@@ -1149,8 +1165,8 @@ const AnalyticsPage: React.FC = () => {
             </CardContent>
           </Card>
         </motion.div>
-        {/* Campaign Modal */}
         <CampaignModal />
+        <AnalyticsModal />
       </div>
     </div>
   );

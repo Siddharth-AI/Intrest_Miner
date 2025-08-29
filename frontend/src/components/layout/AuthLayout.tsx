@@ -4,6 +4,7 @@ import { Footer } from "./Footer";
 import Sidebar from "./Sidebar";
 import { useState } from "react";
 import CampaignModal from "@/components/model/CampaignModal"; // Import your modal
+import AnalyticsModal from "../model/AnalyticsModal";
 export default function AuthLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -53,6 +54,7 @@ export default function AuthLayout() {
         </div> */}
         {/* 🎯 Modal at Layout Level - Overlays Everything */}
         <CampaignModal />
+        <AnalyticsModal />
       </div>
     </div>
   );

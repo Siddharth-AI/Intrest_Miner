@@ -61,7 +61,7 @@ export const fetchProfileData = createAsyncThunk(
         return rejectWithValue('No access token found');
       }
 
-      const response = await fetch('http://localhost:1000/auth/profile-data', {
+      const response = await fetch(`${import.meta.env.VITE_INTEREST_MINER_API_URL}/auth/profile-data`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -104,7 +104,7 @@ export const updateProfileData = createAsyncThunk(
         return rejectWithValue('No access token found');
       }
 
-      const response = await fetch('http://localhost:1000/auth/update-profile', {
+      const response = await fetch(`${import.meta.env.VITE_INTEREST_MINER_API_URL}/auth/update-profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

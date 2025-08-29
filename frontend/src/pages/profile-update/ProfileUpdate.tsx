@@ -19,6 +19,7 @@ import {
   fetchProfileData,
   resetUpdateStatus,
 } from "../../../store/features/profileSlice";
+import { toast } from "@/hooks/use-toast";
 
 const ProfileUpdate: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -31,6 +32,13 @@ const ProfileUpdate: React.FC = () => {
     updateError,
     updateSuccess,
   } = useAppSelector((state) => state.profile);
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/miner");
+    }
+  };
 
   const [formData, setFormData] = useState({
     name: "",
@@ -41,11 +49,6 @@ const ProfileUpdate: React.FC = () => {
   });
 
   const [isEditing, setIsEditing] = useState<boolean>(false); // New state for toggling edit mode
-  const [message, setMessage] = useState<string | null>(null);
-  const [messageType, setMessageType] = useState<"success" | "error" | null>(
-    null
-  );
-
   useEffect(() => {
     // Fetch profile data if not already available in the store
     if (!userData && !loading && !error) {
@@ -57,44 +60,50 @@ const ProfileUpdate: React.FC = () => {
         contact: userData.contact || "",
         address: userData.address || "",
         country: userData.country || "",
-        dob: userData.dob || "", // Assuming DOB is in YYYY-MM-DD format
+        dob: userData.dob || "",
+        // Assuming DOB is in YYYY-MM-DD format
       });
     }
   }, [userData, loading, error, dispatch]);
 
   useEffect(() => {
     if (updateSuccess) {
-      setMessage("Profile updated successfully!");
-      setMessageType("success");
+      toast({
+        title: "Profile updated successfully!",
+      });
       setIsEditing(false); // Exit edit mode on successful update
       // Optionally navigate back after a short delay, or just show success message
 
       dispatch(fetchProfileData());
 
       const timer = setTimeout(() => {
-        setMessage(null); // Clear message after some time
-        setMessageType(null);
         dispatch(resetUpdateStatus()); // Reset status after message clears
         // navigate("/profile"); // You can re-enable this if you want to navigate back automatically
       }, 2000);
       return () => clearTimeout(timer);
     } else if (updateError) {
-      setMessage(updateError);
-      setMessageType("error");
+      toast({
+        title: "Profile updated failed",
+        variant: "destructive",
+      });
     }
   }, [updateSuccess, updateError, navigate, dispatch]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormData({ ...formData, [e.target.name]: e.target.value || "" });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage(null);
-    setMessageType(null);
-    await dispatch(updateProfileData(formData));
+    const dataToSend = { ...formData };
+    // Convert empty string DOB to null before sending
+    if (dataToSend.dob === "") {
+      dataToSend.dob = null;
+    }
+    console.log(dataToSend);
+    await dispatch(updateProfileData(dataToSend));
   };
 
   const renderField = (
@@ -109,14 +118,12 @@ const ProfileUpdate: React.FC = () => {
         {" "}
         {/* Reduced gap */}
         <Icon className="h-4 w-4 text-[#3b82f6]" /> {/* Reduced icon size */}
-        <span className="font-medium text-[#111827] text-sm">
+        <span className="font-medium text-[#111827] text-lg">
           {label}:
         </span>{" "}
         {/* Reduced font size */}
       </div>
-      <span className="text-[#2d3748] font-semibold text-sm">
-        {value || "N/A"}
-      </span>{" "}
+      <span className="text-[#2d3748] font-semibold text-md">{value}</span>{" "}
       {/* Reduced font size */}
     </div>
   );
@@ -173,11 +180,11 @@ const ProfileUpdate: React.FC = () => {
   }
 
   return (
-    <div className=" pt-32 pb-20 min-h-screen bg-gradient-to-br from-[#e0f2fe] to-[#bfdbfe] p-4 flex items-center justify-center font-inter">
+    <div className=" pt-32 pb-20 min-h-screen bg-gradient-to-br from-[#f1f5f9] to-[rgba(124,58,237,0.11)] p-4 flex items-center justify-center font-inter">
       {" "}
       {/* Reduced overall padding */}
       <motion.div
-        className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xl max-w-xl w-full transform transition-all duration-300 hover:shadow-2xl"
+        className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xl max-w-3xl w-full transform transition-all duration-300 hover:shadow-2xl"
         initial={{ opacity: 0, y: 30, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.6, ease: "easeOut" }}>
@@ -187,18 +194,21 @@ const ProfileUpdate: React.FC = () => {
           {" "}
           {/* Reduced margin-bottom, padding-bottom */}
           <div className="flex items-center">
-            <motion.button
-              onClick={() => navigate("/profile")}
-              className="mr-3 p-2 rounded-full bg-[#e0f2fe] hover:bg-[#cce8ff] transition-all duration-200 shadow-md"
-              whileTap={{ scale: 0.92 }}>
-              {" "}
-              {/* Adjusted scale */}
-              <ArrowLeft className="h-5 w-5 text-[#3b82f6]" />{" "}
-              {/* Reduced icon size */}
-            </motion.button>
-            <h2 className="text-3xl font-extrabold text-[#111827]">
-              Account Settings
-            </h2>{" "}
+            {!isEditing && (
+              <motion.button
+                onClick={handleGoBack}
+                className="mr-3 p-2 rounded-full bg-[#e0f2fe] hover:bg-[#cce8ff] transition-all duration-200 shadow-md"
+                whileTap={{ scale: 0.92 }}>
+                {" "}
+                {/* Adjusted scale */}
+                <ArrowLeft className="h-5 w-5 text-[#3b82f6]" />
+                {/* Reduced icon size */}
+              </motion.button>
+            )}
+            <h2 className="text-xl sm:ml-4 sm:text-3xl font-extrabold text-[#111827]">
+              {!isEditing ? "Profile Details" : "Update Profile"}
+            </h2>
+
             {/* Reduced font size */}
           </div>
           {!isEditing && (
@@ -212,33 +222,12 @@ const ProfileUpdate: React.FC = () => {
               whileTap={{ scale: 0.97 }}>
               {" "}
               {/* Adjusted scale */}
-              <Edit className="h-4 w-4" /> Edit Profile{" "}
+              <Edit className="h-4 w-4" />
+              Edit
               {/* Reduced icon size */}
             </motion.button>
           )}
         </div>
-        {message && (
-          <motion.div
-            className={`px-4 py-3 rounded-xl mb-6 text-base font-medium flex items-center gap-2 ${
-              /* Reduced padding, rounded, margin-bottom, font size, gap */
-              messageType === "success"
-                ? "bg-green-50 text-green-800 border border-green-200"
-                : "bg-red-50 text-red-800 border border-red-200"
-            } shadow-sm`}
-            initial={{ opacity: 0, y: -15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}>
-            {" "}
-            {/* Reduced duration */}
-            {messageType === "success" ? (
-              <CheckCircle className="h-5 w-5" />
-            ) : (
-              <Shield className="h-5 w-5" />
-            )}{" "}
-            {/* Reduced icon size */}
-            {message}
-          </motion.div>
-        )}
         {isEditing ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             {" "}
@@ -258,6 +247,7 @@ const ProfileUpdate: React.FC = () => {
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
+                required
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-3 focus:ring-[#3b82f6]/40 focus:border-[#3b82f6] outline-none transition-all duration-200 bg-gray-50 text-[#111827] text-base shadow-sm"
               />
             </div>
@@ -272,7 +262,13 @@ const ProfileUpdate: React.FC = () => {
                 id="contact"
                 name="contact"
                 value={formData.contact}
-                onChange={handleChange}
+                onChange={(e) => {
+                  const input = e.target.value;
+                  // Only update if input is digits only
+                  if (/^\d*$/.test(input)) {
+                    handleChange(e);
+                  }
+                }}
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-3 focus:ring-[#3b82f6]/40 focus:border-[#3b82f6] outline-none transition-all duration-200 bg-gray-50 text-[#111827] text-base shadow-sm"
               />
             </div>
@@ -374,6 +370,16 @@ const ProfileUpdate: React.FC = () => {
           )
         )}
       </motion.div>
+      <div className="overflow-hidden">
+        <div className="-z-10 absolute top-[4.2rem] right-2 w-24 h-24 bg-gradient-to-b from-blue-500 to-purple-400 rounded-full opacity-30 animate-float"></div>
+        <div
+          className="-z-10 absolute bottom-4 right-[33rem] w-32 h-32 bg-gradient-to-r from-black to-purple-600 rounded-full opacity-20 animate-float"
+          style={{ animationDelay: "2s" }}></div>
+        <div className="-z-10 absolute -bottom-48 left-24 w-48 h-48 bg-gradient-to-t from-purple-500 to-blue-300 rounded-full opacity-30 animate-float"></div>
+        <div className="-z-10 absolute top-48 left-60 w-48 h-48 bg-gradient-to-t from-purple-500 to-blue-600 rounded-full opacity-70 animate-float"></div>
+        {/* <div className="-z-10 absolute top-[20rem] left-[20rem] w-40 h-40 bg-gradient-to-b from-purple-600 to-blue-500 rounded-full opacity-30 animate-float"></div> */}
+        <div className="-z-10 absolute top-[20rem] right-[10rem] w-36 h-36 bg-gradient-to-t from-blue-500 to-purple-400 rounded-full opacity-20 animate-float"></div>
+      </div>
     </div>
   );
 };

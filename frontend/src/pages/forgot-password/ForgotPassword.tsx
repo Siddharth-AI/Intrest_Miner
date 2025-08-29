@@ -1,13 +1,13 @@
-import ForgotPasswordForm from "@/components/ForgotPasswordForm";
-import RegisterForm from "@/components/RegisterForm";
-import VerifyOtpForm from "@/components/VerifyOtpForm";
-import ResetPasswordForm from "@/components/ResetPasswordForm";
+import ForgotPasswordForm from "@/components/forms/ForgotPasswordForm";
+import RegisterForm from "@/components/forms/RegisterForm";
+import VerifyOtpForm from "@/components/forms/VerifyOtpForm";
+import ResetPasswordForm from "@/components/forms/ResetPasswordForm";
 import { Menu, Pickaxe, X } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const ForgotPassword = () => {
-  const [step, setStep] = useState<'email' | 'otp' | 'reset'>('email');
+  const [step, setStep] = useState<"email" | "otp" | "reset">("email");
   const [email, setEmail] = useState<string>("");
   const [resetToken, setResetToken] = useState<string>("");
   const navigate = useNavigate();
@@ -120,14 +120,28 @@ const ForgotPassword = () => {
             </div>
           </div>
           {/* Stepper logic */}
-          {step === 'email' && (
-            <ForgotPasswordForm onOtpSent={(email) => { setEmail(email); setStep('otp'); }} />
+          {step === "email" && (
+            <ForgotPasswordForm
+              onOtpSent={(email) => {
+                setEmail(email);
+                setStep("otp");
+              }}
+            />
           )}
-          {step === 'otp' && (
-            <VerifyOtpForm email={email} onVerified={(token) => { setResetToken(token); setStep('reset'); }} />
+          {step === "otp" && (
+            <VerifyOtpForm
+              email={email}
+              onVerified={(token) => {
+                setResetToken(token);
+                setStep("reset");
+              }}
+            />
           )}
-          {step === 'reset' && (
-            <ResetPasswordForm resetToken={resetToken} onReset={() => navigate('/login')} />
+          {step === "reset" && (
+            <ResetPasswordForm
+              resetToken={resetToken}
+              onReset={() => navigate("/login")}
+            />
           )}
         </div>
       </div>

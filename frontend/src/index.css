@@ -104,7 +104,30 @@
   width: 111.11%;
   max-height: 111.11vh;
 }
+.csv-class {
+  /* Custom scrollbar styles */
+  scrollbar-width: thin; /* "auto" or "none" */
+  scrollbar-color: #888 #f1f1f1; /* thumb and track color */
+}
 
+/* For Webkit browsers (Chrome, Safari, Edge) */
+.csv-class::-webkit-scrollbar {
+  width: 8px; /* Width of the scrollbar */
+}
+
+.csv-class::-webkit-scrollbar-track {
+  background: #f1f1f1; /* Color of the scrollbar track */
+  border-radius: 10px; /* Rounded corners for the track */
+}
+
+.csv-class::-webkit-scrollbar-thumb {
+  background: #888; /* Color of the scrollbar thumb */
+  border-radius: 10px; /* Rounded corners for the thumb */
+}
+
+.csv-class::-webkit-scrollbar-thumb:hover {
+  background: #555; /* Color of the scrollbar thumb on hover */
+}
 
 /* @layer base {
   :root {
@@ -193,4 +216,3 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 } */
-

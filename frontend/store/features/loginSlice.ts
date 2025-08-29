@@ -28,7 +28,7 @@ export const loginUser = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await axios.post("http://localhost:1000/auth/login", data, {
+      const response = await axios.post(`${import.meta.env.VITE_INTEREST_MINER_API_URL}/auth/login`, data, {
         headers: { "Content-Type": "application/json" },
       });
       return response.data;

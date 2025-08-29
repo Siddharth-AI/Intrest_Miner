@@ -1,4 +1,4 @@
-import RegisterForm from "@/components/RegisterForm";
+import RegisterForm from "@/components/forms/RegisterForm";
 import { Button } from "@/components/ui/button";
 import { Menu, Pickaxe, X } from "lucide-react";
 import { useState } from "react";

@@ -12,8 +12,10 @@ const razorpay = new Razorpay({
  * @param {string} currency - Currency code (default: 'INR')
  * @param {string} receipt - Unique receipt/order id
  * @param {object} notes - Additional notes (optional)
+
  */
 async function createOrder(amount, currency = 'INR', receipt, notes = {}) {
+  console.log(amount, "====>>>>>>>>>>")
   const options = {
     amount: Math.round(amount), // amount in paise
     currency,

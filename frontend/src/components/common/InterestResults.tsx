@@ -1,4 +1,3 @@
-// src/components/InterestResults.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -32,12 +31,11 @@ import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 
 // Redux imports
-import { useAppDispatch, useAppSelector } from "../../store/hooks"; // Adjust path as needed
+import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import {
   generateInterests,
   resetOpenAiState,
-  AnalyzedInterest,
-} from "../../store/features/openaiSlice"; // Adjust path as needed
+} from "../../../store/features/openaiSlice";
 
 interface InterestResultsProps {
   businessData: BusinessFormData;
@@ -47,24 +45,53 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
   const { toast } = useToast();
   const dispatch = useAppDispatch();
   const {
-    data: openAiData, // Use openAiData for the response
+    data: openAiData,
     loading: isLoading,
     error,
-  } = useAppSelector((state) => state.openai);
+  } = useAppSelector((state) => state.openAi);
+
+  // Theme detection - ONLY ADDITION
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  useEffect(() => {
+    const checkTheme = () => {
+      const isDark = document.documentElement.classList.contains("dark");
+      setIsDarkMode(isDark);
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
-  // interests will now be derived from openAiData.analyzedInterests
   const [processingStep, setProcessingStep] = useState<string>(
     "Generating interests with AI..."
   );
-  const [progress, setProgress] = useState<number>(0); // This will be a mock progress as actual API doesn't provide it
+  const [progress, setProgress] = useState<number>(0);
 
   useEffect(() => {
     const fetchData = async () => {
-      // Reset state before new generation
-      dispatch(resetOpenAiState());
+      if (!businessData) {
+        console.log("No business data available for analysis");
+        return;
+      }
+      if (
+        openAiData &&
+        openAiData.businessInfo &&
+        openAiData.businessInfo.productName === businessData.productName
+      ) {
+        console.log(
+          "Using existing persisted data for:",
+          businessData.productName
+        );
+        return;
+      }
 
-      // Simulate progress for the UI
+      console.log("Fetching new data for:", businessData.productName);
+
       let currentProgress = 0;
       const interval = setInterval(() => {
         currentProgress += 10;
@@ -77,15 +104,14 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
         } else {
           clearInterval(interval);
         }
-      }, 300); // Update every 300ms
+      }, 500);
 
       try {
         const resultAction = await dispatch(generateInterests(businessData));
-        clearInterval(interval); // Clear interval once API call is done
-        setProgress(100); // Ensure progress is 100%
+        clearInterval(interval);
+        setProgress(100);
 
         if (generateInterests.fulfilled.match(resultAction)) {
-          // No need to setInterests here, as it will be derived from openAiData
           toast({
             title: "Analysis Complete",
             description: `Found and analyzed ${resultAction.payload.analyzedInterests.length} potential Meta ad interests for your business.`,
@@ -98,27 +124,21 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
               "There was a problem processing your request. Please try again.",
             variant: "destructive",
           });
-          // Fallback to mock data on error if openAiData is null
-          // This part can be adjusted based on whether you always want mock data on API error
-          // For now, it will just show the error and not populate the table from mock.
-          // If you want mock data on error, you'd set openAiData in the slice's rejected case.
         }
       } catch (err) {
-        clearInterval(interval); // Ensure interval is cleared even if dispatch fails unexpectedly
+        clearInterval(interval);
         console.error("Error dispatching generateInterests:", err);
         toast({
           title: "Error",
           description: "An unexpected error occurred. Please try again.",
           variant: "destructive",
         });
-        // Fallback to mock data on unexpected error
       }
     };
 
     fetchData();
-  }, [businessData, dispatch, toast]);
+  }, [businessData, dispatch, toast, openAiData]);
 
-  // Derived state from Redux store
   const interests = openAiData?.analyzedInterests || [];
 
   const formatAudienceSize = (lower: number, upper: number) => {
@@ -135,10 +155,36 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
     switch (category) {
       case "Technology":
         return "bg-[#3b82f6]/20 text-[#3b82f6] border-[#3b82f6]/30";
-      case "Business and industry":
-        return "bg-green-500/20 text-green-700 border-green-500/30";
       case "Education":
         return "bg-[#2563eb]/20 text-[#2563eb] border-[#2563eb]/30";
+      case "E-commerce":
+        return "bg-purple-500/20 text-purple-700 border-purple-500/30";
+      case "Healthcare":
+        return "bg-red-500/20 text-red-700 border-red-500/30";
+      case "Finance":
+        return "bg-green-600/20 text-green-800 border-green-600/30";
+      case "Real Estate":
+        return "bg-yellow-500/20 text-yellow-700 border-yellow-500/30";
+      case "Food & Beverage":
+        return "bg-orange-500/20 text-orange-700 border-orange-500/30";
+      case "Fashion":
+        return "bg-pink-500/20 text-pink-700 border-pink-500/30";
+      case "Automotive":
+        return "bg-gray-700/20 text-gray-900 border-gray-700/30";
+      case "Travel":
+        return "bg-indigo-500/20 text-indigo-700 border-indigo-500/30";
+      case "Entertainment":
+        return "bg-teal-500/20 text-teal-700 border-teal-500/30";
+      case "Sports & Fitness":
+        return "bg-lime-500/20 text-lime-700 border-lime-500/30";
+      case "Beauty":
+        return "bg-fuchsia-500/20 text-fuchsia-700 border-fuchsia-500/30";
+      case "Home & Garden":
+        return "bg-emerald-500/20 text-emerald-700 border-emerald-500/30";
+      case "Professional Services":
+        return "bg-cyan-500/20 text-cyan-700 border-cyan-500/30";
+      case "Business and industry":
+        return "bg-green-500/20 text-green-700 border-green-500/30";
       default:
         return "bg-[#2d3748]/20 text-[#2d3748] border-[#2d3748]/30";
     }
@@ -207,26 +253,26 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}>
-        <Card className="bg-[#f1f5f9] border-[#2d3748]/20 shadow-lg">
+        <Card className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-700 shadow-lg">
           <CardContent className="p-8 text-center">
             <div className="flex flex-col items-center justify-center space-y-4">
               <div className="relative w-20 h-20">
                 <Loader className="w-20 h-20 text-[#3b82f6] animate-spin" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-[#111827] text-sm font-bold">
+                  <span className="text-[#111827] dark:text-white text-sm font-bold">
                     {progress}%
                   </span>
                 </div>
               </div>
-              <h3 className="text-xl font-semibold text-[#111827] mb-2">
+              <h3 className="text-xl font-semibold text-[#111827] dark:text-white mb-2">
                 {processingStep}
               </h3>
-              <div className="w-full bg-[#2d3748]/20 rounded-full h-2.5">
+              <div className="w-full bg-[#2d3748]/20 dark:bg-gray-600 rounded-full h-2.5">
                 <div
                   className="bg-gradient-to-r from-[#3b82f6] to-[#2563eb] h-2.5 rounded-full transition-all duration-300"
                   style={{ width: `${progress}%` }}></div>
               </div>
-              <p className="text-[#2d3748] text-sm mt-2">
+              <p className="text-[#2d3748] dark:text-gray-300 text-sm mt-2">
                 This may take a minute as we analyze thousands of potential
                 interests...
               </p>
@@ -237,17 +283,20 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
     );
   }
 
-  // If there's an error and no data, you might want to display an error message
   if (error && !interests.length) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}>
-        <Card className="bg-red-50 border-red-200 shadow-lg">
+        <Card className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 shadow-lg">
           <CardHeader className="text-center">
-            <CardTitle className="text-red-700">Error</CardTitle>
-            <CardDescription className="text-red-600">{error}</CardDescription>
+            <CardTitle className="text-red-700 dark:text-red-300">
+              Error
+            </CardTitle>
+            <CardDescription className="text-red-600 dark:text-red-400">
+              {error}
+            </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <Button onClick={() => dispatch(resetOpenAiState())}>
@@ -259,15 +308,14 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
     );
   }
 
-  // If there's no data yet (e.g., initial load or after reset) and not loading
   if (!openAiData && !isLoading) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}>
-        <Card className="bg-[#f1f5f9] border-[#2d3748]/20 shadow-lg">
-          <CardContent className="p-8 text-center text-[#2d3748]">
+        <Card className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-700 shadow-lg">
+          <CardContent className="p-8 text-center text-[#2d3748] dark:text-gray-300">
             <p>
               No analysis results available yet. Please provide business
               information to start.
@@ -290,15 +338,15 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}>
-          <Card className="bg-[#f1f5f9] border-[#2d3748]/20 shadow-lg hover:shadow-blue-100 transition-all duration-300">
+          <Card className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-700 shadow-lg hover:shadow-blue-100 transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center">
                 <Target className="h-8 w-8 text-[#3b82f6] mr-3" />
                 <div>
-                  <p className="text-sm font-medium text-[#2d3748]">
+                  <p className="text-sm font-medium text-[#2d3748] dark:text-gray-300">
                     Total Interests Found
                   </p>
-                  <p className="text-2xl font-bold text-[#111827]">
+                  <p className="text-2xl font-bold text-[#111827] dark:text-white">
                     {interests.length}
                   </p>
                 </div>
@@ -311,15 +359,15 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}>
-          <Card className="bg-[#f1f5f9] border-[#2d3748]/20 shadow-lg hover:shadow-blue-100 transition-all duration-300">
+          <Card className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-700 shadow-lg hover:shadow-blue-100 transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center">
                 <Users className="h-8 w-8 text-[#2563eb] mr-3" />
                 <div>
-                  <p className="text-sm font-medium text-[#2d3748]">
+                  <p className="text-sm font-medium text-[#2d3748] dark:text-gray-300">
                     Avg. Audience Size
                   </p>
-                  <p className="text-xl font-bold text-[#111827]">
+                  <p className="text-xl font-bold text-[#111827] dark:text-white">
                     {interests.length > 0
                       ? formatAudienceSize(
                           totalAudience / interests.length,
@@ -337,15 +385,15 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}>
-          <Card className="bg-[#f1f5f9] border-[#2d3748]/20 shadow-lg hover:shadow-blue-100 transition-all duration-300">
+          <Card className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-700 shadow-lg hover:shadow-blue-100 transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center">
                 <TrendingUp className="h-8 w-8 text-green-600 mr-3" />
                 <div>
-                  <p className="text-sm font-medium text-[#2d3748]">
+                  <p className="text-sm font-medium text-[#2d3748] dark:text-gray-300">
                     Top Relevance Score
                   </p>
-                  <p className="text-2xl font-bold text-[#111827]">
+                  <p className="text-2xl font-bold text-[#111827] dark:text-white">
                     {interests.length > 0
                       ? `${Math.max(
                           ...interests.map((i) => i.relevanceScore)
@@ -364,14 +412,14 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 0.4 }}>
-        <Card className="bg-[#f1f5f9] border-[#2d3748]/20 shadow-lg">
+        <Card className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-700 shadow-lg">
           <CardHeader>
             <div className="flex justify-between items-start">
               <div>
-                <CardTitle className="text-[#111827]">
+                <CardTitle className="text-[#111827] dark:text-white">
                   Meta Ad Interest Analysis
                 </CardTitle>
-                <CardDescription className="text-[#2d3748]">
+                <CardDescription className="text-[#2d3748] dark:text-gray-300">
                   AI-generated and ranked interests for{" "}
                   {businessData.productName}
                 </CardDescription>
@@ -379,34 +427,33 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
               <Button
                 onClick={handleExportCSV}
                 className="bg-green-600 hover:bg-green-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
-                disabled={interests.length === 0} // Disable if no interests
-              >
+                disabled={interests.length === 0}>
                 <Download className="w-4 h-4 mr-2" />
                 Export CSV
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="rounded-xl border border-[#2d3748]/20 overflow-hidden">
+            <div className="rounded-xl border border-[#2d3748]/20 dark:border-gray-700 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-[#2d3748]/20 hover:bg-[#3b82f6]/5">
-                    <TableHead className="text-[#2d3748] font-semibold">
+                  <TableRow className="border-[#2d3748]/20 dark:border-gray-700 hover:bg-[#3b82f6]/5 dark:hover:bg-gray-700/50">
+                    <TableHead className="text-[#2d3748] dark:text-gray-300 font-semibold">
                       Rank
                     </TableHead>
-                    <TableHead className="text-[#2d3748] font-semibold">
+                    <TableHead className="text-[#2d3748] dark:text-gray-300 font-semibold">
                       Interest Name
                     </TableHead>
-                    <TableHead className="text-[#2d3748] font-semibold">
+                    <TableHead className="text-[#2d3748] dark:text-gray-300 font-semibold">
                       Audience Size
                     </TableHead>
-                    <TableHead className="text-[#2d3748] font-semibold">
+                    <TableHead className="text-[#2d3748] dark:text-gray-300 font-semibold">
                       Relevance
                     </TableHead>
-                    <TableHead className="text-[#2d3748] font-semibold">
+                    <TableHead className="text-[#2d3748] dark:text-gray-300 font-semibold">
                       Category
                     </TableHead>
-                    <TableHead className="text-[#2d3748] font-semibold">
+                    <TableHead className="text-[#2d3748] dark:text-gray-300 font-semibold">
                       Topic
                     </TableHead>
                   </TableRow>
@@ -416,9 +463,9 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                     interests.map((interest) => (
                       <TableRow
                         key={interest.name}
-                        className="border-[#2d3748]/20 hover:bg-[#3b82f6]/5 cursor-pointer transition-colors"
+                        className="border-[#2d3748]/20 dark:border-gray-700 hover:bg-[#3b82f6]/5 dark:hover:bg-gray-700/50 cursor-pointer transition-colors"
                         onClick={() => toggleInterestSelection(interest.name)}>
-                        <TableCell className="text-[#111827] font-medium">
+                        <TableCell className="text-[#111827] dark:text-white font-medium">
                           <div className="flex items-center">
                             #{interest.rank}
                             {interest.rank <= 3 && (
@@ -426,7 +473,7 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-[#111827] font-medium">
+                        <TableCell className="text-[#111827] dark:text-white font-medium">
                           <div className="flex items-center">
                             <input
                               type="checkbox"
@@ -441,7 +488,7 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                             {interest.name}
                           </div>
                         </TableCell>
-                        <TableCell className="text-[#2d3748]">
+                        <TableCell className="text-[#2d3748] dark:text-gray-300">
                           {formatAudienceSize(
                             interest.audienceSizeLowerBound,
                             interest.audienceSizeUpperBound
@@ -449,14 +496,14 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center">
-                            <div className="w-12 bg-[#2d3748]/20 rounded-full h-2 mr-2">
+                            <div className="w-12 bg-[#2d3748]/20 dark:bg-gray-600 rounded-full h-2 mr-2">
                               <div
                                 className="bg-gradient-to-r from-[#3b82f6] to-[#2563eb] h-2 rounded-full transition-all duration-300"
                                 style={{
                                   width: `${interest.relevanceScore}%`,
                                 }}></div>
                             </div>
-                            <span className="text-[#111827] font-medium">
+                            <span className="text-[#111827] dark:text-white font-medium">
                               {interest.relevanceScore}%
                             </span>
                           </div>
@@ -469,7 +516,7 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                             {interest.category}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-[#2d3748]">
+                        <TableCell className="text-[#2d3748] dark:text-gray-300">
                           {interest.topic}
                         </TableCell>
                       </TableRow>
@@ -478,7 +525,7 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                     <TableRow>
                       <TableCell
                         colSpan={6}
-                        className="text-center text-[#2d3748] py-8">
+                        className="text-center text-[#2d3748] dark:text-gray-300 py-8">
                         {error
                           ? "Failed to load interests."
                           : "No interests found for your business data yet."}
@@ -491,11 +538,11 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
 
             {selectedInterests.length > 0 && (
               <motion.div
-                className="mt-4 p-4 bg-[#3b82f6]/5 rounded-xl border border-[#2d3748]/20"
+                className="mt-4 p-4 bg-[#3b82f6]/5 dark:bg-blue-900/20 rounded-xl border border-[#2d3748]/20 dark:border-gray-700"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}>
-                <p className="text-[#111827] font-medium mb-2">
+                <p className="text-[#111827] dark:text-white font-medium mb-2">
                   Selected Interests ({selectedInterests.length}):
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -535,9 +582,11 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 0.5 }}>
-        <Card className="bg-[#f1f5f9] border-[#2d3748]/20 shadow-lg">
+        <Card className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-700 shadow-lg">
           <CardHeader>
-            <CardTitle className="text-[#111827]">Workflow Summary</CardTitle>
+            <CardTitle className="text-[#111827] dark:text-white">
+              Workflow Summary
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -545,10 +594,10 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                 <h4 className="text-[#3b82f6] font-medium">
                   Step 1: Business Analysis
                 </h4>
-                <p className="text-[#2d3748]">
+                <p className="text-[#2d3748] dark:text-gray-300">
                   ✓ Collected business information
                 </p>
-                <p className="text-[#2d3748]">
+                <p className="text-[#2d3748] dark:text-gray-300">
                   ✓ Generated AI prompt for {businessData.category} sector
                 </p>
               </div>
@@ -556,10 +605,10 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                 <h4 className="text-[#3b82f6] font-medium">
                   Step 2: GPT Interest Generation
                 </h4>
-                <p className="text-[#2d3748]">
+                <p className="text-[#2d3748] dark:text-gray-300">
                   ✓ AI analyzed: {businessData.productName}
                 </p>
-                <p className="text-[#2d3748]">
+                <p className="text-[#2d3748] dark:text-gray-300">
                   ✓ Generated potential relevant interests
                 </p>
               </div>
@@ -567,10 +616,10 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                 <h4 className="text-[#3b82f6] font-medium">
                   Step 3: Meta Graph API Query
                 </h4>
-                <p className="text-[#2d3748]">
+                <p className="text-[#2d3748] dark:text-gray-300">
                   ✓ Fetched complete audience data from Meta
                 </p>
-                <p className="text-[#2d3748]">
+                <p className="text-[#2d3748] dark:text-gray-300">
                   ✓ Collected: Name, Audience Size, Path, Topic
                 </p>
               </div>
@@ -578,10 +627,10 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                 <h4 className="text-[#3b82f6] font-medium">
                   Step 4: AI Analysis
                 </h4>
-                <p className="text-[#2d3748]">
+                <p className="text-[#2d3748] dark:text-gray-300">
                   ✓ Analyzed data with GPT for best performers
                 </p>
-                <p className="text-[#2d3748]">
+                <p className="text-[#2d3748] dark:text-gray-300">
                   ✓ Ranked and scored for business relevance
                 </p>
               </div>

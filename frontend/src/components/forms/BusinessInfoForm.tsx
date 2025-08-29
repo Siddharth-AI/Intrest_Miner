@@ -1,8 +1,7 @@
 "use client";
 
 import type React from "react";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +16,14 @@ import {
 import type { BusinessFormData } from "@/types/business";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
+import { DNA } from "react-loader-spinner";
+
+// Redux imports
+import { useAppDispatch, useAppSelector } from "../../../store/hooks";
+import {
+  saveBusinessDetails,
+  resetSaveBusinessDetailsState,
+} from "../../../store/features/openAiSearchHistorySlice";
 
 interface BusinessInfoFormProps {
   onSubmit: (data: BusinessFormData) => void;
@@ -25,6 +32,30 @@ interface BusinessInfoFormProps {
 
 const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
   const { toast } = useToast();
+  const dispatch = useAppDispatch();
+
+  // Theme detection - ONLY ADDITION
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  useEffect(() => {
+    const checkTheme = () => {
+      const isDark = document.documentElement.classList.contains("dark");
+      setIsDarkMode(isDark);
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const {
+    savingBusinessDetails,
+    saveBusinessDetailsError,
+    savedBusinessDetailsSuccess,
+  } = useAppSelector((state) => state.aiSearchHistory);
+
   const [formData, setFormData] = useState<BusinessFormData>({
     productName: "",
     category: "",
@@ -38,7 +69,6 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate form
     const requiredFields = Object.entries(formData);
     const emptyFields = requiredFields.filter(([_, value]) => !value.trim());
 
@@ -51,47 +81,19 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
       return;
     }
 
-    // --- API Call for Business Search History ---
-    try {
-      const accessToken = localStorage.getItem("token"); // Get access token from localStorage
-      if (!accessToken) {
-        console.log("token not found");
-      }
-      const response = await fetch(
-        "http://localhost:1000/business/businesSearchistory",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify(formData), // Sending the entire formData object
-        }
-      );
+    const resultAction = await dispatch(saveBusinessDetails(formData));
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.log("Failed to store business form data:", errorData);
-        // Optionally, show a toast or message to the user about the API call failure
-        toast({
-          description: "Failed to save business information.",
-          variant: "destructive",
-        });
-      } else {
-        const successData = await response.json();
-        console.log("Business form data stored successfully:", successData);
-        // No UI update needed as per requirement, just logging for verification
-      }
-    } catch (apiError) {
-      console.error("Error calling business search history API:", apiError);
-      toast({
-        description: "Network error while saving business information.",
-        variant: "destructive",
-      });
+    if (saveBusinessDetails.fulfilled.match(resultAction)) {
+      console.log("Business information saved successfully!");
+    } else if (saveBusinessDetails.rejected.match(resultAction)) {
+      console.log("Failed to save business information. Please try again.");
     }
-    // --- End of API Call for Business Search History ---
 
     onSubmit(formData);
+
+    setTimeout(() => {
+      dispatch(resetSaveBusinessDetailsState());
+    }, 3000);
   };
 
   const handleInputChange = (field: keyof BusinessFormData, value: string) => {
@@ -140,7 +142,9 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}>
-          <Label htmlFor="productName" className="text-[#111827] font-medium">
+          <Label
+            htmlFor="productName"
+            className="text-[#111827] dark:text-white font-medium">
             Product/Business Name *
           </Label>
           <Input
@@ -148,7 +152,7 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
             placeholder="e.g., Coding Sharks"
             value={formData.productName}
             onChange={(e) => handleInputChange("productName", e.target.value)}
-            className="bg-[#f1f5f9] border-[#2d3748]/20 text-[#111827] placeholder:text-[#2d3748] focus:border-[#3b82f6] focus:ring-[#3b82f6]/20 rounded-xl"
+            className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-600 text-[#111827] dark:text-white placeholder:text-[#2d3748] dark:placeholder:text-gray-400 focus:border-[#3b82f6] focus:ring-[#3b82f6]/20 rounded-xl"
           />
         </motion.div>
 
@@ -157,21 +161,23 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}>
-          <Label htmlFor="category" className="text-[#111827] font-medium">
+          <Label
+            htmlFor="category"
+            className="text-[#111827] dark:text-white font-medium">
             Category *
           </Label>
           <Select
             value={formData.category}
             onValueChange={(value) => handleInputChange("category", value)}>
-            <SelectTrigger className="bg-[#f1f5f9] border-[#2d3748]/20 text-[#111827] focus:border-[#3b82f6] focus:ring-[#3b82f6]/20 rounded-xl">
+            <SelectTrigger className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-600 text-[#111827] dark:text-white focus:border-[#3b82f6] focus:ring-[#3b82f6]/20 rounded-xl">
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
-            <SelectContent className="bg-[#f1f5f9] border-[#2d3748]/20 rounded-xl">
+            <SelectContent className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-600 rounded-xl">
               {categories.map((category) => (
                 <SelectItem
                   key={category}
                   value={category}
-                  className="text-[#111827] hover:bg-[#3b82f6]/10 focus:bg-[#3b82f6]/10">
+                  className="text-[#111827] dark:text-white hover:bg-[#3b82f6]/10 dark:hover:bg-gray-700 focus:bg-[#3b82f6]/10 dark:focus:bg-gray-700">
                   {category}
                 </SelectItem>
               ))}
@@ -187,7 +193,7 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
         transition={{ duration: 0.6, delay: 0.3 }}>
         <Label
           htmlFor="productDescription"
-          className="text-[#111827] font-medium">
+          className="text-[#111827] dark:text-white font-medium">
           Product/Business Description *
         </Label>
         <Textarea
@@ -197,7 +203,7 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
           onChange={(e) =>
             handleInputChange("productDescription", e.target.value)
           }
-          className="bg-[#f1f5f9] border-[#2d3748]/20 text-[#111827] placeholder:text-[#2d3748] focus:border-[#3b82f6] focus:ring-[#3b82f6]/20 rounded-xl min-h-[100px] resize-none"
+          className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-600 text-[#111827] dark:text-white placeholder:text-[#2d3748] dark:placeholder:text-gray-400 focus:border-[#3b82f6] focus:ring-[#3b82f6]/20 rounded-xl min-h-[100px] resize-none"
         />
       </motion.div>
 
@@ -207,7 +213,9 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}>
-          <Label htmlFor="location" className="text-[#111827] font-medium">
+          <Label
+            htmlFor="location"
+            className="text-[#111827] dark:text-white font-medium">
             Location *
           </Label>
           <Input
@@ -215,7 +223,7 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
             placeholder="e.g., Indore, Madhya Pradesh"
             value={formData.location}
             onChange={(e) => handleInputChange("location", e.target.value)}
-            className="bg-[#f1f5f9] border-[#2d3748]/20 text-[#111827] placeholder:text-[#2d3748] focus:border-[#3b82f6] focus:ring-[#3b82f6]/20 rounded-xl"
+            className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-600 text-[#111827] dark:text-white placeholder:text-[#2d3748] dark:placeholder:text-gray-400 focus:border-[#3b82f6] focus:ring-[#3b82f6]/20 rounded-xl"
           />
         </motion.div>
 
@@ -224,7 +232,9 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}>
-          <Label htmlFor="promotionGoal" className="text-[#111827] font-medium">
+          <Label
+            htmlFor="promotionGoal"
+            className="text-[#111827] dark:text-white font-medium">
             Promotion Goal *
           </Label>
           <Select
@@ -232,15 +242,15 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
             onValueChange={(value) =>
               handleInputChange("promotionGoal", value)
             }>
-            <SelectTrigger className="bg-[#f1f5f9] border-[#2d3748]/20 text-[#111827] focus:border-[#3b82f6] focus:ring-[#3b82f6]/20 rounded-xl">
+            <SelectTrigger className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-600 text-[#111827] dark:text-white focus:border-[#3b82f6] focus:ring-[#3b82f6]/20 rounded-xl">
               <SelectValue placeholder="Select goal" />
             </SelectTrigger>
-            <SelectContent className="bg-[#f1f5f9] border-[#2d3748]/20 rounded-xl">
+            <SelectContent className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-600 rounded-xl">
               {promotionGoals.map((goal) => (
                 <SelectItem
                   key={goal}
                   value={goal}
-                  className="text-[#111827] hover:bg-[#3b82f6]/10 focus:bg-[#3b82f6]/10">
+                  className="text-[#111827] dark:text-white hover:bg-[#3b82f6]/10 dark:hover:bg-gray-700 focus:bg-[#3b82f6]/10 dark:focus:bg-gray-700">
                   {goal}
                 </SelectItem>
               ))}
@@ -254,7 +264,9 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 0.6 }}>
-        <Label htmlFor="targetAudience" className="text-[#111827] font-medium">
+        <Label
+          htmlFor="targetAudience"
+          className="text-[#111827] dark:text-white font-medium">
           Target Audience *
         </Label>
         <Input
@@ -262,7 +274,7 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
           placeholder="e.g., Freshers, Graduates, Career Switchers"
           value={formData.targetAudience}
           onChange={(e) => handleInputChange("targetAudience", e.target.value)}
-          className="bg-[#f1f5f9] border-[#2d3748]/20 text-[#111827] placeholder:text-[#2d3748] focus:border-[#3b82f6] focus:ring-[#3b82f6]/20 rounded-xl"
+          className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-600 text-[#111827] dark:text-white placeholder:text-[#2d3748] dark:placeholder:text-gray-400 focus:border-[#3b82f6] focus:ring-[#3b82f6]/20 rounded-xl"
         />
       </motion.div>
 
@@ -271,7 +283,9 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 0.7 }}>
-        <Label htmlFor="contactEmail" className="text-[#111827] font-medium">
+        <Label
+          htmlFor="contactEmail"
+          className="text-[#111827] dark:text-white font-medium">
           Contact Email *
         </Label>
         <Input
@@ -280,7 +294,7 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
           placeholder="your.email@example.com"
           value={formData.contactEmail}
           onChange={(e) => handleInputChange("contactEmail", e.target.value)}
-          className="bg-[#f1f5f9] border-[#2d3748]/20 text-[#111827] placeholder:text-[#2d3748] focus:border-[#3b82f6] focus:ring-[#3b82f6]/20 rounded-xl"
+          className="bg-[#f1f5f9] dark:bg-gray-800 border-[#2d3748]/20 dark:border-gray-600 text-[#111827] dark:text-white placeholder:text-[#2d3748] dark:placeholder:text-gray-400 focus:border-[#3b82f6] focus:ring-[#3b82f6]/20 rounded-xl"
         />
       </motion.div>
 
@@ -290,12 +304,18 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
         transition={{ duration: 0.6, delay: 0.8 }}>
         <Button
           type="submit"
-          disabled={isLoading}
-          className="w-full bg-[#3b82f6] hover:bg-[#2d3748] text-[#f1f5f9] font-semibold py-3 text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl">
-          {isLoading ? (
+          disabled={isLoading || savingBusinessDetails}
+          className="w-full bg-[#3b82f6] hover:bg-[#2d3748] dark:bg-blue-600 dark:hover:bg-blue-700 text-[#f1f5f9] font-semibold py-3 text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl">
+          {isLoading || savingBusinessDetails ? (
             <div className="flex items-center">
-              <div className="animate-spin rounded-full h-5 w-5 border-2 border-[#f1f5f9] border-t-transparent mr-2"></div>
-              Processing...
+              <DNA
+                visible={true}
+                height="80"
+                width="80"
+                ariaLabel="dna-loading"
+                wrapperStyle={{}}
+                wrapperClass="dna-wrapper"
+              />
             </div>
           ) : (
             "Generate Interest Suggestions"

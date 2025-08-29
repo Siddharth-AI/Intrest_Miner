@@ -303,7 +303,9 @@ const getProfile = async (req, res) => {
         }
 
         // Parse the JSON_OBJECT result
-        const profileData = JSON.parse(results[0].profile);
+        const profileData = typeof results[0].profile === 'string'
+            ? JSON.parse(results[0].profile)
+            : results[0].profile;
 
         return res.status(200).json({
             status: 200,

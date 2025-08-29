@@ -69,7 +69,8 @@ const processPaymentSchema = Joi.object({
       "paypal",
       "stripe",
       "bank_transfer",
-      "wallet"
+      "wallet",
+      "razorpay"
     )
     .required(),
   payment_token: Joi.string().required(),

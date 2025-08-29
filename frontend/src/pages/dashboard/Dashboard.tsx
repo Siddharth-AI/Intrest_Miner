@@ -1,597 +1,799 @@
-"use client";
-import type React from "react";
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+// components/Dashboard.tsx
+import React, { useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
+import {
+  EyeIcon,
+  ChartBarIcon,
+  UserGroupIcon,
+  CalendarDaysIcon,
+  ArrowTrendingUpIcon,
+  ArrowUpRightIcon,
+  SparklesIcon,
+  BoltIcon,
+  ClockIcon,
+  TrophyIcon,
+  UsersIcon,
+  ArrowPathIcon,
+} from "@heroicons/react/24/outline";
 import { motion } from "framer-motion";
-
-// Redux Imports // Adjust path to your store
 import {
-  searchFacebookInterests,
-  resetSearchState,
-  setCurrentPage,
-  setSelectedRows,
-  toggleRowSelection,
-} from "../../../store/features/facebookSlice"; // Adjust path to your slice
-import { useAppSelector, useAppDispatch } from "../../../store/hooks"; // Adjust path to your hooks
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import {
-  Search,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  AlertCircle,
-  Download,
-  TrendingUp,
-  Users,
-  Target,
-} from "lucide-react";
-import { toast } from "@/hooks/use-toast";
-import { fetchProfileData } from "../../../store/features/profileSlice";
+  fetchAdAccounts,
+  fetchCampaigns,
+  fetchInsights,
+  setSelectedAccount,
+  setSelectedCampaign,
+} from "../../../store/features/facebookAdsSlice";
 
-interface Message {
-  type: "success" | "error";
-  text: string;
-}
-
-export default function App() {
-  // Renamed to App for React immersive compatibility
-  // Redux state - now includes selectedRows and currentPage
+const Dashboard: React.FC = () => {
   const dispatch = useAppDispatch();
+  const { toast } = useToast();
+
+  // Redux state
   const {
-    interests: results,
-    totalResults: resultCount,
-    status,
+    adAccounts,
+    campaigns,
+    insights,
+    aggregatedStats,
+    selectedAccount,
+    selectedCampaign,
+    loading,
+    lastUpdated,
     error,
-    selectedRows,
-    currentPage,
-  } = useAppSelector((state) => state.facebookSearch);
+  } = useAppSelector((state) => state.facebookAds);
 
+  const [isDarkMode, setIsDarkMode] = React.useState(false);
+
+  // Handle token from OAuth redirect
   useEffect(() => {
-    dispatch(fetchProfileData());
-  }, []);
-  // Local state for UI messages
-  const [message, setMessage] = useState<Message | null>(null);
-  const [itemsPerPage] = useState<number>(10);
-
-  const router = useNavigate();
-  const searchTermRef = useRef<HTMLInputElement>(null);
-
-  const isLoading = status === "loading";
-  const hasSearched = status === "succeeded" || status === "failed";
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router("/login");
-    }
-  }, [router]);
-
-  const handleSearch = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const query = searchTermRef.current?.value || "";
-    if (!query.trim()) {
-      dispatch(resetSearchState()); // This now resets everything in Redux
-      if (searchTermRef.current) {
-        searchTermRef.current.value = "";
+    const hash = window.location.hash;
+    if (hash && hash.includes("access_token")) {
+      const hashParams = new URLSearchParams(hash.substring(1));
+      const token = hashParams.get("access_token");
+      console.log(token, "dashboard token=>>>>>>>>>>>>>>>>>>>");
+      if (token) {
+        localStorage.setItem("FB_ACCESS_TOKEN", token);
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname
+        );
+        // Fetch accounts after token is saved
+        dispatch(fetchAdAccounts());
       }
-      toast({
-        description: "Please enter a search term",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // --- API Call for Search History ---
-    try {
-      const accessToken = localStorage.getItem("token"); // Get access token from localStorage
-      if (!accessToken) {
-        console.log("token no found");
-      }
-
-      const response = await fetch("http://localhost:1000/search-history/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`, // Include access token in header
-        },
-        body: JSON.stringify({ search_text: query }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Failed to store search history:", errorData);
-        // Optionally, show a toast or message to the user about the API call failure
-        toast({
-          description: "Failed to save search history.",
-          variant: "destructive",
-        });
-      } else {
-        const successData = await response.json();
-        console.log("Search history stored successfully:", successData);
-        // No UI update needed as per requirement, just logging for verification
-      }
-    } catch (apiError) {
-      console.error("Error calling search history API:", apiError);
-      toast({
-        description: "Network error while saving search history.",
-        variant: "destructive",
-      });
-    }
-    // --- End of API Call for Search History ---
-
-    dispatch(searchFacebookInterests({ query, limit: 1000 }));
-  };
-
-  // UPDATED: Handlers now dispatch Redux actions
-  const handleClearSelection = () => {
-    dispatch(setSelectedRows([]));
-  };
-
-  const handleSelectRow = (id: string) => {
-    dispatch(toggleRowSelection(id));
-  };
-
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const allIds = e.target.checked ? results.map((row) => row.id) : [];
-    dispatch(setSelectedRows(allIds));
-  };
-
-  const handleExport = () => {
-    // This logic remains the same as it reads from the Redux state
-    const selectedItems = results.filter((item) =>
-      selectedRows.includes(item.id)
-    );
-    if (selectedItems.length === 0) {
-      setMessage({
-        type: "error",
-        text: "Please select at least one item to export",
-      });
-      setTimeout(() => setMessage(null), 3000);
-      return;
-    }
-    const headers = [
-      "Name",
-      "Audience Size Lower",
-      "Audience Size Upper",
-      "Path",
-      "Topic",
-    ];
-    const rows = selectedItems.map((item) => [
-      `"${item.name}"`,
-      item.audience_size_lower_bound,
-      item.audience_size_upper_bound,
-      `"${item.path?.join(" > ") || ""}"`,
-      `"${item.topic || ""}"`,
-    ]);
-    const csvContent = [headers, ...rows]
-      .map((row) => row.join(","))
-      .join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute(
-      "download",
-      `${searchTermRef.current?.value || "selected_interests"}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setMessage({
-      type: "success",
-      text: `${selectedItems.length} items exported successfully`,
-    });
-    setTimeout(() => setMessage(null), 3000);
-  };
-
-  const totalPages = Math.ceil(resultCount / itemsPerPage);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = results.slice(indexOfFirstItem, indexOfLastItem);
-
-  // UPDATED: Pagination handlers now dispatch Redux actions
-  const nextPage = () => {
-    if (currentPage < totalPages) {
-      dispatch(setCurrentPage(currentPage + 1));
-    }
-  };
-  const prevPage = () => {
-    if (currentPage > 1) {
-      dispatch(setCurrentPage(currentPage - 1));
-    }
-  };
-  const firstPage = () => dispatch(setCurrentPage(1));
-  const lastPage = () => dispatch(setCurrentPage(totalPages));
-
-  // This function can stay as it is
-  function formatAudienceSize(number: number): string {
-    if (number >= 1_000_000_000) {
-      return (number / 1_000_000_000).toFixed(1).replace(/\.0$/, "") + "B";
-    } else if (number >= 1_000_000) {
-      return (number / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
-    } else if (number >= 1_000) {
-      return (number / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
     } else {
-      return number.toString();
+      // Try to load accounts if token already exists
+      const existingToken = localStorage.getItem("FB_ACCESS_TOKEN");
+      if (existingToken && adAccounts.length === 0) {
+        dispatch(fetchAdAccounts());
+      }
     }
-  }
+  }, [dispatch, adAccounts.length]);
 
-  const EmptyState = ({ type }: { type: string }) => {
-    const isInitialLoad = type === "initial";
-    const message = isInitialLoad
-      ? "Ready to discover amazing ad interests? Start your first search!"
-      : "No data found. Try a different search term.";
-    return (
-      <motion.div
-        className="flex flex-col items-center justify-center py-12 md:py-16 px-4 md:px-8"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}>
-        <div className="relative mb-8">
-          <motion.div
-            className="absolute -inset-4 bg-gradient-to-r from-[#3b82f6]/20 to-[#2563eb]/20 rounded-full blur-xl"
-            animate={{
-              scale: [1, 1.1, 1],
-              opacity: [0.2, 0.3, 0.2],
-            }}
-            transition={{
-              duration: 3,
-              repeat: Number.POSITIVE_INFINITY,
-              ease: "easeInOut",
-            }}
-          />
-          <div className="relative bg-[#f1f5f9] rounded-2xl p-6 md:p-8 border border-[#2d3748]/20 shadow-lg">
-            <svg
-              className="h-12 md:h-16 w-12 md:w-16 text-[#3b82f6] mx-auto mb-4"
-              viewBox="0 0 24 24"
-              fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12c0 1.54.36 2.98.97 4.29L1 23l6.71-1.97C9.02 21.64 10.46 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2z" />
-              <circle cx="8.5" cy="10.5" r="1.5" />
-              <circle cx="15.5" cy="10.5" r="1.5" />
-              <path d="M12 16c-1.1 0-2-.9-2 0h4c0 1.1-.9 2-2 2z" />
-            </svg>
-            <div className="bg-gradient-to-r from-[#3b82f6]/20 to-[#2563eb]/20 rounded-xl p-3 md:p-4 border border-[#3b82f6]/30">
-              <p className="text-[#2d3748] text-center font-medium text-sm md:text-base">
-                {message}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="text-center max-w-md px-4">
-          <h3 className="text-lg md:text-xl font-semibold text-[#111827] mb-2">
-            {isInitialLoad
-              ? "Welcome to InterestMiner! 🚀"
-              : "Oops! Nothing found 🔍"}
-          </h3>
-          <p className="text-[#2d3748] leading-relaxed text-sm md:text-base">
-            {isInitialLoad
-              ? "Use our AI-powered search to discover highly targeted Facebook ad interests that will boost your campaign performance."
-              : "Try using different keywords, check your spelling, or explore broader terms to find relevant interests."}
-          </p>
-        </div>
-      </motion.div>
-    );
+  // Auto-fetch campaigns when selectedAccount changes
+  useEffect(() => {
+    if (selectedAccount && selectedAccount !== "") {
+      console.log(
+        "🔄 Dashboard: Fetching campaigns for account:",
+        selectedAccount
+      );
+      dispatch(fetchCampaigns(selectedAccount));
+    }
+  }, [selectedAccount, dispatch]);
+
+  // Auto-fetch insights when selectedAccount changes or campaigns are loaded
+  useEffect(() => {
+    if (selectedAccount && selectedAccount !== "" && campaigns.length > 0) {
+      console.log(
+        "🔄 Dashboard: Fetching insights for account:",
+        selectedAccount
+      );
+      dispatch(fetchInsights());
+    }
+  }, [selectedAccount, campaigns.length, dispatch]);
+
+  // Handle account selection with immediate data fetching
+  const handleAccountChange = useCallback(
+    (accountId: string) => {
+      console.log("🔄 Dashboard: Account changed to:", accountId);
+      dispatch(setSelectedAccount(accountId));
+      // Clear previous campaign selection
+      dispatch(setSelectedCampaign(""));
+
+      // Show loading toast
+      toast({
+        title: "Loading Data",
+        description: "Fetching campaigns and insights...",
+      });
+    },
+    [dispatch, toast]
+  );
+
+  // Handle campaign selection
+  const handleCampaignChange = useCallback(
+    (campaignId: string) => {
+      console.log("🔄 Dashboard: Campaign changed to:", campaignId);
+      dispatch(setSelectedCampaign(campaignId));
+    },
+    [dispatch]
+  );
+
+  // Manual refresh function
+  const handleRefresh = useCallback(() => {
+    if (selectedAccount) {
+      dispatch(fetchCampaigns(selectedAccount)).then(() => {
+        dispatch(fetchInsights());
+      });
+      toast({
+        title: "Refreshing Data",
+        description: "Updating campaigns and insights...",
+      });
+    } else if (adAccounts.length > 0) {
+      dispatch(fetchAdAccounts());
+    }
+  }, [selectedAccount, adAccounts.length, dispatch, toast]);
+
+  // Show error toast when error occurs
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
+
+  // Theme detection
+  useEffect(() => {
+    const checkTheme = () => {
+      const isDark = document.documentElement.classList.contains("dark");
+      setIsDarkMode(isDark);
+    };
+
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
   };
+
+  // Format number
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + "M";
+    } else if (num >= 1000) {
+      return (num / 1000).toFixed(1) + "K";
+    }
+    return num.toString();
+  };
+
+  // Generate stats from live data
+  const generateStats = () => {
+    if (!aggregatedStats) {
+      return [
+        {
+          name: "Connect Your Account",
+          value: adAccounts.length > 0 ? "Connected" : "--",
+          change:
+            adAccounts.length > 0
+              ? "Account ready"
+              : "Connect Meta Ads to view data",
+          changeType: adAccounts.length > 0 ? "increase" : "neutral",
+          icon: EyeIcon,
+          gradient: "from-blue-500 to-cyan-500",
+          bgGradient:
+            "from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20",
+        },
+        {
+          name: "Total Campaigns",
+          value: campaigns.length.toString() || "0",
+          change: loading
+            ? "Loading..."
+            : campaigns.length > 0
+            ? "Campaigns loaded"
+            : "No campaigns found",
+          changeType: campaigns.length > 0 ? "increase" : "neutral",
+          icon: ChartBarIcon,
+          gradient: "from-emerald-500 to-green-500",
+          bgGradient:
+            "from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20",
+        },
+        {
+          name: "Active Campaigns",
+          value: campaigns
+            .filter((c) => c.status === "ACTIVE")
+            .length.toString(),
+          change: `${campaigns.length} total campaigns`,
+          changeType:
+            campaigns.filter((c) => c.status === "ACTIVE").length > 0
+              ? "increase"
+              : "neutral",
+          icon: UserGroupIcon,
+          gradient: "from-purple-500 to-pink-500",
+          bgGradient:
+            "from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20",
+        },
+        {
+          name: "Data Status",
+          value:
+            insights.length > 0 ? "Ready" : loading ? "Loading" : "No Data",
+          change:
+            insights.length > 0
+              ? `${insights.length} insights available`
+              : loading
+              ? "Fetching insights..."
+              : "Select account to load data",
+          changeType:
+            insights.length > 0 ? "increase" : loading ? "neutral" : "warning",
+          icon: CalendarDaysIcon,
+          gradient: "from-orange-500 to-yellow-500",
+          bgGradient:
+            "from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20",
+        },
+      ];
+    }
+
+    return [
+      {
+        name: "Total Spend",
+        value: formatCurrency(aggregatedStats.totalSpend),
+        change: "+12.5% from last period",
+        changeType: "increase",
+        icon: ChartBarIcon,
+        gradient: "from-blue-500 to-cyan-500",
+        bgGradient:
+          "from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20",
+      },
+      {
+        name: "Total Impressions",
+        value: formatNumber(aggregatedStats.totalImpressions),
+        change: "+8.3% improvement",
+        changeType: "increase",
+        icon: EyeIcon,
+        gradient: "from-emerald-500 to-green-500",
+        bgGradient:
+          "from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20",
+      },
+      {
+        name: "Active Campaigns",
+        value: campaigns.filter((c) => c.status === "ACTIVE").length.toString(),
+        change: `${campaigns.length} total campaigns`,
+        changeType: "increase",
+        icon: UserGroupIcon,
+        gradient: "from-purple-500 to-pink-500",
+        bgGradient:
+          "from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20",
+      },
+      {
+        name: "Average CTR",
+        value: `${(aggregatedStats.avgCTR * 100).toFixed(2)}%`,
+        change: "+2.1% improvement",
+        changeType: "increase",
+        icon: ArrowTrendingUpIcon,
+        gradient: "from-orange-500 to-yellow-500",
+        bgGradient:
+          "from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20",
+      },
+    ];
+  };
+
+  const stats = generateStats();
+
+  const recentActivity = [
+    {
+      id: 1,
+      action: aggregatedStats
+        ? `Generated insights for ${campaigns.length} campaigns`
+        : adAccounts.length > 0
+        ? `Connected ${adAccounts.length} ad account(s)`
+        : "Connect your Meta account to view activity",
+      time: lastUpdated ? new Date(lastUpdated).toLocaleString("en-IN") : "N/A",
+      status: "completed",
+      icon: SparklesIcon,
+    },
+    {
+      id: 2,
+      action: aggregatedStats
+        ? `Total spend: ${formatCurrency(aggregatedStats.totalSpend)}`
+        : campaigns.length > 0
+        ? `Found ${campaigns.length} campaigns`
+        : "Campaign data will appear here",
+      time: campaigns.length > 0 ? "Recently loaded" : "N/A",
+      status: "improved",
+      icon: TrophyIcon,
+    },
+    {
+      id: 3,
+      action: selectedAccount
+        ? "Account selected - data syncing"
+        : "Analytics dashboard ready for optimization",
+      time: selectedAccount ? "Just now" : "2 days ago",
+      status: selectedAccount ? "completed" : "pending",
+      icon: BoltIcon,
+    },
+  ];
+
+  const quickActions = [
+    {
+      title: "Generate New Interests",
+      description:
+        "Use AI to discover high-performing audience interests for your campaigns",
+      icon: EyeIcon,
+      gradient: "from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600",
+      bgGradient:
+        "from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30",
+      link: "/miner",
+      buttonText: "Start Generating",
+    },
+    {
+      title: "Campaign Analytics",
+      description:
+        "Connect your Meta accounts for deep campaign insights and optimization",
+      icon: ChartBarIcon,
+      gradient:
+        "from-emerald-600 to-emerald-700 dark:from-emerald-500 dark:to-emerald-600",
+      bgGradient:
+        "from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/30",
+      link: "/analytics",
+      buttonText: "View Analytics",
+      badge: aggregatedStats ? "Live Data" : "Connect First",
+    },
+  ];
 
   return (
-    <div className="pt-32 pb-20 min-h-screen bg-gradient-to-br from-[#f1f5f9] to-[rgba(124,58,237,0.11)]">
-      <div className="p-4 sm:p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Hero Section */}
-          <motion.div
-            className="text-center mb-6 md:mb-8"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#111827] mb-2 md:mb-4">
-              AI-Powered Interest Discovery
-            </h1>
-          </motion.div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Enhanced Welcome Header */}
+        <motion.div
+          className="mb-8"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent">
+                Welcome back! 👋
+              </h1>
+              <p className="text-gray-600 dark:text-gray-300 text-lg">
+                Here's an overview of your InterestMiner performance and Meta
+                Ads data.
+              </p>
+            </div>
+            <motion.div
+              className="hidden md:flex md:gap-4 "
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.3, type: "spring" }}>
+              <div className="flex flex-col gap-2">
+                {/* Ad Account Selector */}
+                {adAccounts.length > 0 && (
+                  <Select
+                    value={selectedAccount}
+                    onValueChange={handleAccountChange}>
+                    <SelectTrigger className="w-[250px] bg-white dark:bg-gray-800">
+                      <UsersIcon className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Select Ad Account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {adAccounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          <div className="flex items-center justify-between w-full">
+                            <span>{account.name}</span>
+                            <Badge variant="secondary" className="ml-2">
+                              {account.currency}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              {/* Status and Refresh */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium flex-1">
+                  <ClockIcon className="w-4 h-4" />
+                  <span>
+                    {loading
+                      ? "Loading..."
+                      : lastUpdated
+                      ? `Updated: ${new Date(lastUpdated).toLocaleTimeString(
+                          "en-IN"
+                        )}`
+                      : "Connect to sync data"}
+                  </span>
+                </div>
+                <Button
+                  onClick={handleRefresh}
+                  disabled={loading}
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0">
+                  <ArrowPathIcon
+                    className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                  />
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
 
-          {/* Main Content */}
-          <div className="flex flex-col lg:flex-row gap-6">
-            <div className="flex-1">
-              {/* Message display */}
-              {message && (
-                <motion.div
-                  className={`mb-4 md:mb-6 px-4 md:px-6 py-3 md:py-4 rounded-2xl flex items-center gap-2 md:gap-3 border ${
-                    message.type === "success"
-                      ? "bg-green-500/20 border-green-400/30 text-green-800"
-                      : "bg-red-500/20 border-red-400/30 text-red-800"
-                  }`}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3 }}>
-                  {message.type === "success" ? (
-                    <div className="h-5 md:h-6 w-5 md:w-6 rounded-full bg-green-500 flex items-center justify-center text-white text-xs md:text-sm font-bold">
-                      ✓
-                    </div>
-                  ) : (
-                    <AlertCircle className="h-5 md:h-6 w-5 md:w-6 text-red-600" />
+        {/* Enhanced Stats Grid */}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+          {stats.map((item, index) => (
+            <motion.div
+              key={item.name}
+              className={`relative overflow-hidden bg-gradient-to-r ${item.bgGradient} rounded-2xl p-6 border border-white/20 dark:border-gray-700/50 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group`}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: index * 0.1 }}
+              whileHover={{ scale: 1.02, y: -5 }}>
+              {/* Gradient overlay */}
+              <div
+                className={`absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}
+              />
+
+              <div className="relative">
+                <div className="flex items-center justify-between mb-4">
+                  <motion.div
+                    className={`w-12 h-12 bg-gradient-to-r ${item.gradient} rounded-xl flex items-center justify-center shadow-lg`}
+                    whileHover={{ scale: 1.1, rotate: 5 }}>
+                    <item.icon className="h-6 w-6 text-white" />
+                  </motion.div>
+                  {item.changeType === "increase" && (
+                    <motion.div
+                      className="flex items-center space-x-1 text-emerald-600 dark:text-emerald-400"
+                      animate={{ y: [0, -2, 0] }}
+                      transition={{ duration: 2, repeat: Infinity }}>
+                      <ArrowTrendingUpIcon className="h-4 w-4" />
+                    </motion.div>
                   )}
-                  <p className="font-medium text-sm md:text-base">
-                    {message.text}
-                  </p>
-                </motion.div>
-              )}
+                  {loading && item.name.includes("Data") && (
+                    <motion.div
+                      className="flex items-center space-x-1 text-blue-600 dark:text-blue-400"
+                      animate={{ rotate: 360 }}
+                      transition={{
+                        duration: 1,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}>
+                      <ArrowPathIcon className="h-4 w-4" />
+                    </motion.div>
+                  )}
+                </div>
 
-              {/* Enhanced Search Bar */}
-              <motion.form
-                onSubmit={handleSearch}
-                className="mb-4 md:mb-8"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}>
-                <div className="relative">
-                  <div className="bg-[#f1f5f9] border border-[#2d3748]/10 rounded-2xl p-1 md:p-2 flex gap-2 md:gap-3 shadow-sm shadow-blue-200">
-                    <div className="flex-1 relative">
-                      <div className="absolute inset-y-0 left-3 md:left-4 flex items-center pointer-events-none">
-                        <Search
-                          size={16}
-                          className="md:w-5 md:h-5 text-[#2d3748]"
-                        />
-                      </div>
-                      <input
-                        ref={searchTermRef}
-                        type="text"
-                        className="w-full bg-transparent border-none text-[#111827] placeholder-[#2d3748] rounded-xl py-2 md:py-4 pl-10 md:pl-12 pr-2 md:pr-4 focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/50"
-                        placeholder="Search for interests..."
-                      />
-                    </div>
-                    <motion.button
-                      type="submit"
-                      className="bg-[#3b82f6] hover:bg-[#2d3748] text-white px-4 md:px-8 py-2 md:py-4 rounded-xl flex items-center gap-1 md:gap-2 font-semibold transition-all duration-200"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}>
-                      <span className="hidden sm:inline">Search</span>
-                      <Search className="sm:hidden h-4 w-4" />
-                    </motion.button>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                    {item.name}
+                  </p>
+                  <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                    {item.value}
+                  </p>
+                  <div className="flex items-center space-x-2">
+                    <span
+                      className={`text-sm font-medium ${
+                        item.changeType === "increase"
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : item.changeType === "warning"
+                          ? "text-orange-600 dark:text-orange-400"
+                          : "text-gray-600 dark:text-gray-400"
+                      }`}>
+                      {item.change}
+                    </span>
                   </div>
                 </div>
-              </motion.form>
+              </div>
+            </motion.div>
+          ))}
+        </div>
 
-              {/* Stats Cards */}
-              <motion.div
-                className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mt-4 mb-6 md:mb-8"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.4 }}>
-                <motion.div className="bg-[#f1f5f9] rounded-2xl p-4 md:p-6 border border-[#2d3748]/20 shadow-lg transition-all duration-300 shadow-blue-100">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[#2d3748] text-xs md:text-sm">
-                        Total Results
-                      </p>
-                      <p className="text-xl md:text-2xl font-bold text-[#111827]">
-                        {resultCount.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="bg-[#3b82f6]/20 rounded-full p-2 md:p-3">
-                      <Target className="h-5 md:h-6 w-5 md:w-6 text-[#3b82f6]" />
-                    </div>
-                  </div>
-                </motion.div>
-                <motion.div className="bg-[#f1f5f9] rounded-2xl p-4 md:p-6 border border-[#2d3748]/20 shadow-lg transition-all duration-300 shadow-blue-100">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[#2d3748] text-xs md:text-sm">
-                        Selected Items
-                      </p>
-                      <p className="text-xl md:text-2xl font-bold text-[#111827]">
-                        {selectedRows.length}
-                      </p>
-                    </div>
-                    <div className="bg-[#2563eb]/20 rounded-full p-2 md:p-3">
-                      <Users className="h-5 md:h-6 w-5 md:w-6 text-[#2563eb]" />
-                    </div>
-                  </div>
-                </motion.div>
-                <motion.div className="bg-[#f1f5f9] rounded-2xl p-4 md:p-6 border border-[#2d3748]/20 shadow-lg transition-all duration-300 shadow-blue-100">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[#2d3748] text-xs md:text-sm">
-                        Current Page
-                      </p>
-                      <p className="text-xl md:text-2xl font-bold text-[#111827]">
-                        {currentPage} of {totalPages || 1}
-                      </p>
-                    </div>
-                    <div className="bg-[#1d4ed8]/20 rounded-full p-2 md:p-3">
-                      <TrendingUp className="h-5 md:h-6 w-5 md:w-6 text-[#1d4ed8]" />
-                    </div>
-                  </div>
-                </motion.div>
-              </motion.div>
+        {/* Enhanced Action Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {quickActions.map((action, index) => (
+            <motion.div
+              key={action.title}
+              className={`relative overflow-hidden bg-gradient-to-br ${action.bgGradient} rounded-2xl p-8 border border-white/20 dark:border-gray-700/50 backdrop-blur-sm group hover:shadow-2xl transition-all duration-300`}
+              initial={{ opacity: 0, x: index === 0 ? -50 : 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 + index * 0.1 }}
+              whileHover={{ scale: 1.02 }}>
+              {/* Animated background */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-              {/* Table/Results Section */}
-              {isLoading ? (
-                <motion.div
-                  className="flex justify-center items-center py-16"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3 }}>
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#3b82f6]"></div>
-                </motion.div>
-              ) : !hasSearched ? (
-                <EmptyState type="initial" />
-              ) : results.length === 0 ? (
-                <EmptyState type="no-results" />
-              ) : (
-                <motion.div
-                  className="bg-white rounded-lg border border-[#2d3748]/20 overflow-hidden shadow-lg"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.6 }}>
-                  {/* Table header */}
-                  <div className="p-3 md:p-4 bg-[#3b82f6]">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        onChange={handleSelectAll}
-                        checked={
-                          results.length > 0 &&
-                          selectedRows.length === results.length
-                        }
-                        className="h-5 w-5 rounded border-gray-300 focus:ring-[#3b82f6]"
-                      />
-                      <span className="ml-1 text-2xl md:text-base font-semibold text-[#111827]">
-                        Select All
-                      </span>
-                      <button
-                        onClick={handleClearSelection}
-                        className="ml-auto text-sm md:text-base text-black font-semibold hover:text-white flex items-center gap-1">
-                        <X size={16} className="md:w-5 md:h-5" />
-                        <span className="hidden sm:inline">Clear</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Table rows */}
-                  <div className="">
-                    {currentItems.map((item, index) => (
-                      <motion.div
-                        key={item.id}
-                        className={`p-3 md:p-4 border-b border-[#2d3748]/10 hover:bg-[#3b82f6]/5 transition-colors flex items-center gap-4 ${
-                          selectedRows.includes(item.id)
-                            ? "bg-[#3b82f6]/10"
-                            : ""
+              <div className="relative">
+                <div className="flex items-center mb-6">
+                  <motion.div
+                    className={`w-14 h-14 bg-gradient-to-r ${action.gradient} rounded-xl flex items-center justify-center mr-4 shadow-lg`}
+                    whileHover={{ scale: 1.1, rotate: 10 }}>
+                    <action.icon className="w-7 h-7 text-white" />
+                  </motion.div>
+                  <div className="flex items-center space-x-3">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      {action.title}
+                    </h3>
+                    {action.badge && (
+                      <motion.span
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium shadow-lg ${
+                          aggregatedStats
+                            ? "bg-emerald-500 text-white"
+                            : "bg-orange-500 text-white"
                         }`}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.05 }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedRows.includes(item.id)}
-                          onChange={() => handleSelectRow(item.id)}
-                          className="h-4 w-4 rounded border-gray-300 focus:ring-[#3b82f6]"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm md:text-base font-medium text-[#111827] truncate">
-                            {item.name}
-                          </p>
-                          <p className="text-xs md:text-sm text-[#2d3748]">
-                            {formatAudienceSize(item.audience_size_lower_bound)}{" "}
-                            -{" "}
-                            {formatAudienceSize(item.audience_size_upper_bound)}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleSelectRow(item.id)}
-                            className="text-xs md:text-sm text-[#3b82f6] hover:text-[#2563eb]">
-                            {selectedRows.includes(item.id)
-                              ? "Selected"
-                              : "Select"}
-                          </button>
-                        </div>
-                      </motion.div>
-                    ))}
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{
+                          delay: 0.6 + index * 0.1,
+                          type: "spring",
+                        }}>
+                        {action.badge}
+                      </motion.span>
+                    )}
                   </div>
-                </motion.div>
-              )}
+                </div>
 
-              {/* Pagination */}
-              {results.length > 0 && (
-                <motion.div
-                  className="flex items-center justify-between mt-4 md:mt-6 bg-black/70 py-3 px-2 rounded-xl shadow-lg"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.8 }}>
-                  <div className="flex items-center gap-1 md:gap-2">
-                    <button
-                      onClick={firstPage}
-                      disabled={currentPage === 1}
-                      className="p-2 rounded-full bg-[#f1f5f9] hover:bg-[#3b82f6] transition-colors disabled:opacity-30 border border-[#2d3748]/20">
-                      <ChevronsLeft size={16} className="text-[#2d3748]" />
-                    </button>
-                    <button
-                      onClick={prevPage}
-                      disabled={currentPage === 1}
-                      className="p-2 rounded-full bg-[#f1f5f9] hover:bg-[#3b82f6] transition-colors disabled:opacity-30 border border-[#2d3748]/20">
-                      <ChevronLeft size={16} className="text-[#2d3748]" />
-                    </button>
-                  </div>
-                  <span className="text-sm md:text-base text-white">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <div className="flex items-center gap-1 md:gap-2">
-                    <button
-                      onClick={nextPage}
-                      disabled={currentPage === totalPages}
-                      className="p-2 rounded-full bg-[#f1f5f9] hover:bg-[#3b82f6] transition-colors disabled:opacity-30 border border-[#2d3748]/20">
-                      <ChevronRight size={16} className="text-[#2d3748]" />
-                    </button>
-                    <button
-                      onClick={lastPage}
-                      disabled={currentPage === totalPages}
-                      className="p-2 rounded-full bg-[#f1f5f9] hover:bg-[#3b82f6] transition-colors disabled:opacity-30 border border-[#2d3748]/20">
-                      <ChevronsRight size={16} className="text-[#2d3748]" />
-                    </button>
-                  </div>
-                </motion.div>
-              )}
+                <p className="text-gray-600 dark:text-gray-300 mb-6 text-base leading-relaxed">
+                  {action.description}
+                </p>
 
-              {/* Selected Items List */}
-              {selectedRows.length > 0 && (
-                <motion.div
-                  className="my-5 flex flex-wrap gap-2 bg-blue-100 p-1 md:p-2 rounded-lg border border-[#2d3748]/20"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}>
-                  {results
-                    .filter((item) => selectedRows.includes(item.id))
-                    .map((item) => (
-                      <motion.div
-                        key={item.id}
-                        className="flex items-center bg-[#f1f5f9] border border-[#2d3748]/20 rounded-lg px-3 py-3 text-sm text-[#111827] gap-2"
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        transition={{ duration: 0.2 }}>
-                        <span className="truncate max-w-[120px]">
-                          {item.name}
-                        </span>
-                        <button
-                          onClick={() => handleSelectRow(item.id)}
-                          className="text-red-600 hover:text-red-700"
-                          title="Remove">
-                          <X size={14} />
-                        </button>
-                      </motion.div>
-                    ))}
-                </motion.div>
-              )}
+                <Link to={action.link}>
+                  <motion.button
+                    className={`inline-flex items-center px-6 py-3 bg-gradient-to-r ${action.gradient} text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 group/btn`}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.98 }}>
+                    <span>{action.buttonText}</span>
+                    <ArrowUpRightIcon className="ml-2 h-5 w-5 group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform duration-200" />
+                  </motion.button>
+                </Link>
+              </div>
+            </motion.div>
+          ))}
+        </div>
 
-              {/* Export Button */}
-              {results.length > 0 && (
-                <motion.button
-                  onClick={handleExport}
-                  className="mt-4 md:mt-6 w-full md:w-auto bg-[#3b82f6] hover:bg-[#2d3748] text-white px-4 md:px-8 py-2 md:py-3 rounded-xl flex items-center justify-center gap-2 font-semibold transition-all duration-200"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 1 }}>
-                  <Download size={16} />
-                  <span>Export Selected ({selectedRows.length})</span>
-                </motion.button>
-              )}
+        {/* Enhanced Bottom Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Enhanced Recent Activity */}
+          <motion.div
+            className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-white/20 dark:border-gray-700/50 shadow-xl"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.6 }}>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                  Recent Activity
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Your latest campaign updates and data sync
+                </p>
+              </div>
+              <motion.div
+                className={`w-2 h-2 rounded-full ${
+                  loading
+                    ? "bg-blue-500"
+                    : aggregatedStats
+                    ? "bg-green-500"
+                    : "bg-orange-500"
+                }`}
+                animate={{
+                  scale: [1, 1.5, 1],
+                  opacity: [0.5, 1, 0.5],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
             </div>
-          </div>
 
-          {/* Floating Elements */}
-          <div className="-z-10 absolute top-[4.2rem] right-2 w-24 h-24 bg-gradient-to-b from-blue-500 to-purple-400 rounded-full opacity-30 animate-float"></div>
-          <div
-            className="-z-10 absolute bottom-4 right-[33rem] w-32 h-32 bg-gradient-to-r from-black to-purple-600 rounded-full opacity-20 animate-float"
-            style={{ animationDelay: "2s" }}></div>
-          <div className="-z-10 absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-t from-purple-500 to-blue-300 rounded-full opacity-30 animate-float"></div>
+            <div className="space-y-6">
+              {recentActivity.map((activity, index) => (
+                <motion.div
+                  key={activity.id}
+                  className="flex items-start space-x-4 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200 group"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.4, delay: 0.8 + index * 0.1 }}>
+                  <motion.div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      activity.status === "completed"
+                        ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                        : activity.status === "improved"
+                        ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                        : "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
+                    }`}
+                    whileHover={{ scale: 1.1 }}>
+                    <activity.icon className="w-5 h-5" />
+                  </motion.div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      {activity.action}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {activity.time}
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
 
-          <div className="-z-10 absolute top-[20rem] left-[20rem] w-40 h-40 bg-gradient-to-b from-purple-600 to-blue-500 rounded-full opacity-30 animate-float"></div>
-          <div className="-z-10 absolute top-[20rem] right-[10rem] w-36 h-36 bg-gradient-to-t from-blue-500 to-purple-400 rounded-full opacity-20 animate-float"></div>
+          {/* Enhanced Account Usage */}
+          <motion.div
+            className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-white/20 dark:border-gray-700/50 shadow-xl"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.7 }}>
+            <div className="mb-6">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                Account Overview
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Meta Ads connection status and data
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              {/* Enhanced Progress Bars */}
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                    Connected Accounts
+                  </span>
+                  <span className="text-sm font-bold text-gray-900 dark:text-white">
+                    {adAccounts.length}
+                  </span>
+                </div>
+                <div className="relative">
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                    <motion.div
+                      className="bg-gradient-to-r from-blue-500 to-cyan-500 h-3 rounded-full shadow-sm"
+                      initial={{ width: 0 }}
+                      animate={{ width: adAccounts.length > 0 ? "100%" : "0%" }}
+                      transition={{
+                        duration: 1.5,
+                        delay: 0.8,
+                        ease: "easeOut",
+                      }}
+                    />
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-cyan-400/20 rounded-full animate-pulse" />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                    Active Campaigns
+                  </span>
+                  <span className="text-sm font-bold text-gray-900 dark:text-white">
+                    {campaigns.filter((c) => c.status === "ACTIVE").length} /{" "}
+                    {campaigns.length}
+                  </span>
+                </div>
+                <div className="relative">
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                    <motion.div
+                      className="bg-gradient-to-r from-emerald-500 to-green-500 h-3 rounded-full shadow-sm"
+                      initial={{ width: 0 }}
+                      animate={{
+                        width:
+                          campaigns.length > 0
+                            ? `${
+                                (campaigns.filter((c) => c.status === "ACTIVE")
+                                  .length /
+                                  campaigns.length) *
+                                100
+                              }%`
+                            : "0%",
+                      }}
+                      transition={{ duration: 1.5, delay: 1, ease: "easeOut" }}
+                    />
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 to-green-400/20 rounded-full animate-pulse" />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                    Data Insights
+                  </span>
+                  <span className="text-sm font-bold text-gray-900 dark:text-white">
+                    {insights.length}
+                  </span>
+                </div>
+                <div className="relative">
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                    <motion.div
+                      className={`h-3 rounded-full shadow-sm ${
+                        insights.length > 0
+                          ? "bg-gradient-to-r from-purple-500 to-pink-500"
+                          : "bg-gradient-to-r from-gray-400 to-gray-500"
+                      }`}
+                      initial={{ width: 0 }}
+                      animate={{
+                        width: insights.length > 0 ? "100%" : "20%",
+                      }}
+                      transition={{
+                        duration: 1.5,
+                        delay: 1.2,
+                        ease: "easeOut",
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Enhanced Connection Status Card */}
+              <motion.div
+                className={`p-6 bg-gradient-to-r ${
+                  adAccounts.length > 0
+                    ? "from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20"
+                    : "from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20"
+                } rounded-xl border ${
+                  adAccounts.length > 0
+                    ? "border-green-200 dark:border-green-800/30"
+                    : "border-orange-200 dark:border-orange-800/30"
+                }`}
+                whileHover={{ scale: 1.02 }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">
+                      Meta Ads Status
+                    </p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      {adAccounts.length > 0
+                        ? `${adAccounts.length} account(s) • ${campaigns.length} campaigns • ${insights.length} insights`
+                        : "Not connected - Click to connect"}
+                    </p>
+                  </div>
+                  <Link
+                    to={
+                      adAccounts.length > 0 ? "/analytics" : "/meta-campaign"
+                    }>
+                    <motion.button
+                      className={`px-4 py-2 text-sm font-medium text-white bg-gradient-to-r ${
+                        adAccounts.length > 0
+                          ? "from-green-500 to-emerald-500"
+                          : "from-orange-500 to-yellow-500"
+                      } rounded-lg hover:shadow-lg transition-all duration-200`}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.98 }}>
+                      {adAccounts.length > 0 ? "View Analytics" : "Connect"}
+                    </motion.button>
+                  </Link>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default Dashboard;

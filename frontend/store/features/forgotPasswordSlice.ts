@@ -26,7 +26,7 @@ export const forgotPassword = createAsyncThunk(
   'forgotPassword/forgotPassword',
   async (email: string, { rejectWithValue }) => {
     try {
-      const response = await axios.post('http://localhost:1000/auth/forgot-password', { email });
+      const response = await axios.post(`${import.meta.env.VITE_INTEREST_MINER_API_URL}/auth/forgot-password`, { email });
       if (response.data.success) {
         return { email, message: response.data.message };
       } else {
@@ -42,7 +42,7 @@ export const verifyOtp = createAsyncThunk(
   'forgotPassword/verifyOtp',
   async (data: { email: string; otp_code: string }, { rejectWithValue }) => {
     try {
-      const response = await axios.post('http://localhost:1000/auth/verify-otp', data);
+      const response = await axios.post(`${import.meta.env.VITE_INTEREST_MINER_API_URL}/auth/verify-otp`, data);
       if (response.data.success) {
         return { resetToken: response.data.data.reset_token, message: response.data.message };
       } else {
@@ -58,7 +58,7 @@ export const resetPassword = createAsyncThunk(
   'forgotPassword/resetPassword',
   async (data: { reset_token: string; new_password: string; confirm_password: string }, { rejectWithValue }) => {
     try {
-      const response = await axios.post('http://localhost:1000/auth/reset-password', data);
+      const response = await axios.post(`${import.meta.env.VITE_INTEREST_MINER_API_URL}/auth/reset-password`, data);
       if (response.data.success) {
         return { message: response.data.message };
       } else {

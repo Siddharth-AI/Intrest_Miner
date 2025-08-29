@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
@@ -22,7 +23,7 @@ export const registerUser = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await axios.post("http://localhost:1000/auth/register", data, {
+      const response = await axios.post(`${import.meta.env.VITE_INTEREST_MINER_API_URL}/auth/register`, data, {
         headers: { "Content-Type": "application/json" },
       });
       return response.data;

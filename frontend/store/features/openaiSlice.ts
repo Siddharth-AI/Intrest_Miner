@@ -52,7 +52,7 @@ export const generateInterests = createAsyncThunk(
 
     try {
       const response = await fetch(
-        "http://localhost:1000/business/generate-interests",
+        `${import.meta.env.VITE_INTEREST_MINER_API_URL}/business/generate-interests`,
         {
           method: "POST",
           headers: {

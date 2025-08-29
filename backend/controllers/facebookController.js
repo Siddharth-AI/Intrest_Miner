@@ -16,6 +16,7 @@ const searchAdInterests = async (req, res) => {
     await checkAndRefreshToken();
 
     const accessToken = process.env.FB_ACCESS_TOKEN;
+    // console.log(accessToken, "===============>token")
     if (!accessToken) {
       return customResponse(
         "Facebook access token not configured",

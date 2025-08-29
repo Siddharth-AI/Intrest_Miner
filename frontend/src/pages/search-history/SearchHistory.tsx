@@ -1,198 +1,5 @@
-// import React, { useEffect } from "react";
-// import { useNavigate } from "react-router-dom";
-// import { motion } from "framer-motion";
-// import {
-//   History,
-//   ArrowLeft,
-//   Search,
-//   Shield,
-//   Calendar,
-//   Clock,
-// } from "lucide-react"; // Added Clock icon
-// import { useAppDispatch, useAppSelector } from "../../../store/hooks"; // Adjusted import path
-// import {
-//   fetchSearchHistory,
-//   SearchHistoryItem,
-// } from "../../../store/features/searchHistorySlice"; // Adjusted import path
+// src/pages/dashboard/search/SearchHistory.tsx
 
-// const SearchHistory: React.FC = () => {
-//   const dispatch = useAppDispatch();
-//   const navigate = useNavigate();
-//   const {
-//     data: searchHistory,
-//     loading,
-//     error,
-//   } = useAppSelector((state) => state.searchHistory);
-
-//   useEffect(() => {
-//     dispatch(fetchSearchHistory());
-//   }, [dispatch]);
-
-//   const formatTimestamp = (timestamp: string): string => {
-//     const date = new Date(timestamp);
-//     return date.toLocaleString(); // Format to a readable local date and time string
-//   };
-
-//   if (loading) {
-//     return (
-//       <motion.div
-//         className="flex flex-col justify-center items-center h-screen bg-gradient-to-br from-[#e0f2fe] to-[#bfdbfe]" // Lighter, more vibrant gradient
-//         initial={{ opacity: 0 }}
-//         animate={{ opacity: 1 }}
-//         transition={{ duration: 0.3 }}>
-//         <div className="relative">
-//           <div className="w-12 h-12 border-4 border-[#3b82f6]/30 border-t-[#3b82f6] rounded-full animate-spin"></div>{" "}
-//           {/* Smaller loader */}
-//           <div
-//             className="absolute inset-0 w-12 h-12 border-4 border-[#2563eb]/30 border-t-[#2563eb] rounded-full animate-spin" // Smaller loader
-//             style={{
-//               animationDirection: "reverse",
-//               animationDuration: "1.5s",
-//             }}></div>
-//         </div>
-//         <p className="text-[#2d3748] mt-3 font-medium text-sm">
-//           {" "}
-//           {/* Smaller text */}
-//           Loading search history...
-//         </p>
-//       </motion.div>
-//     );
-//   }
-
-//   if (error) {
-//     return (
-//       <motion.div
-//         className="bg-red-500/20 border border-red-400/30 text-red-800 px-4 py-3 rounded-xl max-w-xl mx-auto mt-8 shadow-lg" // Smaller padding, rounded
-//         initial={{ opacity: 0, y: 20 }}
-//         animate={{ opacity: 1, y: 0 }}
-//         transition={{ duration: 0.5 }}>
-//         <p className="flex items-center gap-2 font-medium text-sm">
-//           {" "}
-//           {/* Smaller text */}
-//           <Shield className="h-4 w-4 text-red-600" /> {/* Smaller icon */}
-//           {error}
-//         </p>
-//         <button
-//           onClick={() => dispatch(fetchSearchHistory())}
-//           className="mt-2 text-xs bg-red-500/30 hover:bg-red-500/50 transition-all duration-200 px-3 py-1.5 rounded-lg text-red-800">
-//           {" "}
-//           {/* Smaller button */}
-//           Try again
-//         </button>
-//       </motion.div>
-//     );
-//   }
-
-//   return (
-//     <div className="pt-32 pb-20 min-h-screen bg-gradient-to-br from-[#e0f2fe] to-[#bfdbfe] p-4 font-inter">
-//       {" "}
-//       {/* Reduced padding */}
-//       <div className="max-w-3xl mx-auto">
-//         {" "}
-//         {/* Reduced max-width */}
-//         <motion.div
-//           className="flex items-center mb-6"
-//           initial={{ opacity: 0, y: -20 }}
-//           animate={{ opacity: 1, y: 0 }}
-//           transition={{ duration: 0.6 }}>
-//           <motion.button
-//             onClick={() => navigate("/profile")}
-//             className="mr-3 p-2 rounded-full bg-[#e0f2fe] hover:bg-[#cce8ff] transition-all duration-200 shadow-md"
-//             whileHover={{ scale: 1.05 }}
-//             whileTap={{ scale: 0.95 }}>
-//             <ArrowLeft className="h-5 w-5 text-[#3b82f6]" />{" "}
-//             {/* Reduced icon size */}
-//           </motion.button>
-//           <h1 className="text-3xl font-extrabold text-[#111827]">
-//             Search History
-//           </h1>{" "}
-//           {/* Reduced font size */}
-//         </motion.div>
-//         {searchHistory.length === 0 ? (
-//           <motion.div
-//             className="bg-white rounded-2xl border border-gray-200 p-6 text-center shadow-xl"
-//             initial={{ opacity: 0, y: 20 }}
-//             animate={{ opacity: 1, y: 0 }}
-//             transition={{ duration: 0.5 }}>
-//             <History className="h-16 w-16 text-[#3b82f6] mx-auto mb-4" />{" "}
-//             {/* Reduced icon size */}
-//             <p className="text-xl text-[#111827] font-bold">
-//               {" "}
-//               {/* Reduced font size */}
-//               No search history found.
-//             </p>
-//             <p className="text-base text-[#2d3748] mt-2">
-//               Start searching to see your history here!
-//             </p>{" "}
-//             {/* Reduced font size */}
-//           </motion.div>
-//         ) : (
-//           <div className="space-y-4">
-//             {" "}
-//             {/* Reduced space-y */}
-//             {searchHistory.map((item: SearchHistoryItem, index: number) => (
-//               <motion.div
-//                 key={item.id}
-//                 className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between transform transition-all duration-300 hover:shadow-md hover:scale-[1.005]"
-//                 initial={{ opacity: 0, y: 20 }}
-//                 animate={{ opacity: 1, y: 0 }}
-//                 transition={{ duration: 0.3, delay: index * 0.05 }}>
-//                 <div className="flex items-start sm:items-center gap-3 w-full sm:w-auto">
-//                   {" "}
-//                   {/* Reduced gap */}
-//                   <div className="p-2 bg-[#e0f2fe] rounded-full text-[#3b82f6] flex-shrink-0">
-//                     {" "}
-//                     {/* Reduced padding */}
-//                     <Search className="h-5 w-5" /> {/* Reduced icon size */}
-//                   </div>
-//                   <div className="flex-grow">
-//                     <p className="font-semibold text-lg text-[#111827] mb-0.5">
-//                       {" "}
-//                       {/* Reduced font size, margin-bottom */}
-//                       {item.search_text}
-//                     </p>
-//                     <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 text-xs text-[#2d3748]">
-//                       {" "}
-//                       {/* Reduced gap, font size */}
-//                       <span className="flex items-center gap-1">
-//                         <Calendar className="h-3 w-3 text-gray-500" />{" "}
-//                         {/* Reduced icon size */}
-//                         Searched on: {formatTimestamp(item.created_at)}
-//                       </span>
-//                       <span className="flex items-center gap-1 mt-0.5 sm:mt-0">
-//                         {" "}
-//                         {/* Reduced margin-top */}
-//                         <Clock className="h-3 w-3 text-gray-500" />{" "}
-//                         {/* Reduced icon size */}
-//                         Last visited: {formatTimestamp(item.last_visited)}
-//                       </span>
-//                     </div>
-//                   </div>
-//                 </div>
-//                 <div className="text-left sm:text-right mt-3 sm:mt-0 sm:ml-auto">
-//                   {" "}
-//                   {/* Reduced margin-top */}
-//                   <p className="text-sm font-medium text-[#111827]">
-//                     {" "}
-//                     {/* Reduced font size */}
-//                     Visits:{" "}
-//                     <span className="font-bold text-[#3b82f6]">
-//                       {item.visit_count}
-//                     </span>
-//                   </p>
-//                   <p className="text-xs text-[#2d3748]/80">Type: {item.type}</p>{" "}
-//                   {/* Reduced font size */}
-//                 </div>
-//               </motion.div>
-//             ))}
-//           </div>
-//         )}
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default SearchHistory;
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -203,317 +10,266 @@ import {
   Shield,
   Calendar,
   Clock,
-  Briefcase, // Icon for business history
+  Briefcase,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import {
   fetchSearchHistory,
-  SearchHistoryItem, // Import SearchHistoryItem from the slice
-} from "../../../store/features/facebookSearchHistorySlice"; // Path to your Facebook search history slice
+  SearchHistoryItem,
+} from "../../../store/features/facebookSearchHistorySlice";
 import {
-  fetchSearchAiHistory, // Import the new thunk
-  SearchHistoryAiItem, // Import the new interface
-} from "../../../store/features/openAiSearchHistorySlice"; // Path to your OpenAI business search slice
+  fetchSearchAiHistory,
+  SearchHistoryAiItem,
+} from "../../../store/features/openAiSearchHistorySlice";
 
 const SearchHistory: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
-  // Facebook Search History state from Redux
+  const handleGoBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/miner");
+  };
+
   const {
     data: facebookSearchHistory,
     loading: facebookLoading,
     error: facebookError,
-  } = useAppSelector((state) => state.searchHistory); // Accessing the facebook search history slice
+  } = useAppSelector((state) => state.facebookSearchHistory);
 
-  // OpenAI Business History state from Redux
   const {
     data: openaiBusinessHistory,
     loading: openaiLoading,
     error: openaiError,
-  } = useAppSelector((state) => state.searchHistoryAi); // Accessing the openai business search slice
-
-  console.log(openaiBusinessHistory, "my data=>>>>>>>");
+  } = useAppSelector((state) => state.aiSearchHistory);
 
   const [activeTab, setActiveTab] = useState<"facebook" | "openai">("facebook");
 
   useEffect(() => {
-    // Fetch Facebook search history on component mount
     if (activeTab === "openai") {
+      dispatch(fetchSearchAiHistory());
+    } else if (activeTab === "facebook") {
       dispatch(fetchSearchHistory());
     }
   }, [activeTab, dispatch]);
 
-  useEffect(() => {
-    // Fetch OpenAI business history when the tab is active
-    if (activeTab === "openai") {
-      dispatch(fetchSearchAiHistory()); // Dispatch the thunk from the new slice
-    } else if (activeTab === "facebook") {
-      dispatch(fetchSearchHistory());
-    }
-  }, [activeTab, dispatch]); // Refetch when activeTab changes to 'openai' or dispatch changes
-
   const formatTimestamp = (timestamp: string): string => {
     const date = new Date(timestamp);
-    return date.toLocaleString(); // Format to a readable local date and time string
+    return date.toLocaleString();
   };
 
   const renderContent = () => {
-    if (activeTab === "facebook") {
-      if (facebookLoading) {
-        return (
-          <motion.div
-            className="flex flex-col justify-center items-center py-16"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}>
-            <div className="relative">
-              <div className="w-12 h-12 border-4 border-[#3b82f6]/30 border-t-[#3b82f6] rounded-full animate-spin"></div>
-              <div
-                className="absolute inset-0 w-12 h-12 border-4 border-[#2563eb]/30 border-t-[#2563eb] rounded-full animate-spin"
-                style={{
-                  animationDirection: "reverse",
-                  animationDuration: "1.5s",
-                }}></div>
-            </div>
-            <p className="text-[#2d3748] mt-3 font-medium text-sm">
-              Loading Facebook search history...
-            </p>
-          </motion.div>
-        );
-      }
+    const loading = activeTab === "facebook" ? facebookLoading : openaiLoading;
+    const error = activeTab === "facebook" ? facebookError : openaiError;
+    const data =
+      activeTab === "facebook" ? facebookSearchHistory : openaiBusinessHistory;
 
-      if (facebookError) {
-        return (
-          <motion.div
-            className="bg-red-500/20 border border-red-400/30 text-red-800 px-4 py-3 rounded-xl max-w-xl mx-auto mt-8 shadow-lg"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}>
-            <p className="flex items-center gap-2 font-medium text-sm">
-              <Shield className="h-4 w-4 text-red-600" />
-              {facebookError}
-            </p>
-            <button
-              onClick={() => dispatch(fetchSearchHistory())} // Retrigger fetch for Facebook
-              className="mt-2 text-xs bg-red-500/30 hover:bg-red-500/50 transition-all duration-200 px-3 py-1.5 rounded-lg text-red-800">
-              Try again
-            </button>
-          </motion.div>
-        );
-      }
-
-      return facebookSearchHistory.length === 0 ? (
+    if (loading) {
+      return (
         <motion.div
-          className="bg-white rounded-2xl border border-gray-200 p-6 text-center shadow-xl"
+          className="flex flex-col items-center justify-center py-16"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}>
+          <div className="relative">
+            <div className="w-12 h-12 border-[5px] border-blue-200 border-t-blue-500 rounded-full animate-spin" />
+            <div
+              className="absolute inset-0 w-12 h-12 border-[5px] border-purple-200 border-t-purple-500 rounded-full animate-spin"
+              style={{
+                animationDirection: "reverse",
+                animationDuration: "1.2s",
+              }}
+            />
+          </div>
+          <p className="text-gray-600 mt-4 text-sm italic tracking-wide">
+            Fetching your historical data...
+          </p>
+        </motion.div>
+      );
+    }
+
+    if (error) {
+      return (
+        <motion.div
+          className="bg-red-100 border border-red-300 text-red-800 px-4 py-3 rounded-xl max-w-xl mx-auto mt-8 shadow-lg"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}>
-          <History className="h-16 w-16 text-[#3b82f6] mx-auto mb-4" />
-          <p className="text-xl text-[#111827] font-bold">
-            No Facebook search history found.
+          <p className="flex items-center gap-2 font-medium text-sm">
+            <Shield className="h-4 w-4 text-red-600" />
+            {error}
           </p>
-          <p className="text-base text-[#2d3748] mt-2">
-            Start searching on Facebook to see your history here!
+          <button
+            onClick={() =>
+              dispatch(
+                activeTab === "facebook"
+                  ? fetchSearchHistory()
+                  : fetchSearchAiHistory()
+              )
+            }
+            className="mt-2 text-xs bg-red-500/20 hover:bg-red-500/40 transition-all duration-200 px-3 py-1.5 rounded-lg text-red-800">
+            Try again
+          </button>
+        </motion.div>
+      );
+    }
+
+    if (data.length === 0) {
+      return (
+        <motion.div
+          className="bg-gradient-to-br from-white to-gray-100 rounded-2xl border border-gray-200 p-8 text-center shadow-xl max-w-2xl mx-auto"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}>
+          {activeTab === "facebook" ? (
+            <Search className="h-16 w-16 text-blue-400 mx-auto mb-4" />
+          ) : (
+            <Briefcase className="h-16 w-16 text-purple-400 mx-auto mb-4" />
+          )}
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+            Nothing found here!
+          </h2>
+          <p className="text-gray-600 text-base">
+            {activeTab === "facebook"
+              ? "You haven't searched anything on Miner yet."
+              : "No Permium submission found."}
           </p>
         </motion.div>
-      ) : (
-        <div className="space-y-4">
-          {facebookSearchHistory.map(
-            (item: SearchHistoryItem, index: number) => (
-              <motion.div
-                key={item.id}
-                className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between transform transition-all duration-300 hover:shadow-md hover:scale-[1.005]"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}>
-                <div className="flex items-start sm:items-center gap-3 w-full sm:w-auto">
-                  <div className="p-2 bg-[#e0f2fe] rounded-full text-[#3b82f6] flex-shrink-0">
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {data.map(
+          (item: SearchHistoryItem | SearchHistoryAiItem, index: number) => (
+            <motion.div
+              key={item.id}
+              className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between hover:shadow-md hover:scale-[1.01] transition duration-300"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05, duration: 0.3 }}>
+              <div className="flex items-start gap-4 w-full">
+                <div className="p-3 bg-blue-50 rounded-full text-blue-600">
+                  {activeTab === "facebook" ? (
                     <Search className="h-5 w-5" />
-                  </div>
-                  <div className="flex-grow">
-                    <p className="font-semibold text-lg text-[#111827] mb-0.5">
-                      {item.search_text}
+                  ) : (
+                    <Briefcase className="h-5 w-5" />
+                  )}
+                </div>
+                <div className="flex-grow space-y-1">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {"productName" in item
+                      ? item.productName
+                      : item.search_text}
+                  </h3>
+                  {"category" in item && (
+                    <p className="text-sm text-gray-500">
+                      Category: {item.category}
                     </p>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 text-xs text-[#2d3748]">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-gray-500" />
-                        Searched on: {formatTimestamp(item.created_at)}
-                      </span>
-                      <span className="flex items-center gap-1 mt-0.5 sm:mt-0">
-                        <Clock className="h-3 w-3 text-gray-500" />
-                        Last visited: {formatTimestamp(item.last_visited)}
-                      </span>
-                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {formatTimestamp(item.created_at)}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {formatTimestamp(item.last_visited)}
+                    </span>
                   </div>
                 </div>
-                <div className="text-left sm:text-right mt-3 sm:mt-0 sm:ml-auto">
-                  <p className="text-sm font-medium text-[#111827]">
+              </div>
+              <div className="text-right mt-4 sm:mt-0">
+                {"visit_count" in item && (
+                  <p className="text-sm text-gray-700">
                     Visits:{" "}
-                    <span className="font-bold text-[#3b82f6]">
+                    <span className="font-bold text-blue-600">
                       {item.visit_count}
                     </span>
                   </p>
-                  <p className="text-xs text-[#2d3748]/80">Type: {item.type}</p>
-                </div>
-              </motion.div>
-            )
-          )}
-        </div>
-      );
-    } else if (activeTab === "openai") {
-      if (openaiLoading) {
-        return (
-          <motion.div
-            className="flex flex-col justify-center items-center py-16"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}>
-            <div className="relative">
-              <div className="w-12 h-12 border-4 border-[#3b82f6]/30 border-t-[#3b82f6] rounded-full animate-spin"></div>
-              <div
-                className="absolute inset-0 w-12 h-12 border-4 border-[#2563eb]/30 border-t-[#2563eb] rounded-full animate-spin"
-                style={{
-                  animationDirection: "reverse",
-                  animationDuration: "1.5s",
-                }}></div>
-            </div>
-            <p className="text-[#2d3748] mt-3 font-medium text-sm">
-              Loading OpenAI business history...
-            </p>
-          </motion.div>
-        );
-      }
-
-      if (openaiError) {
-        return (
-          <motion.div
-            className="bg-red-500/20 border border-red-400/30 text-red-800 px-4 py-3 rounded-xl max-w-xl mx-auto mt-8 shadow-lg"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}>
-            <p className="flex items-center gap-2 font-medium text-sm">
-              <Shield className="h-4 w-4 text-red-600" />
-              {openaiError}
-            </p>
-            <button
-              onClick={() => dispatch(fetchSearchAiHistory())} // Retrigger fetch for OpenAI
-              className="mt-2 text-xs bg-red-500/30 hover:bg-red-500/50 transition-all duration-200 px-3 py-1.5 rounded-lg text-red-800">
-              Try again
-            </button>
-          </motion.div>
-        );
-      }
-
-      return openaiBusinessHistory.length === 0 ? (
-        <motion.div
-          className="bg-white rounded-2xl border border-gray-200 p-6 text-center shadow-xl"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}>
-          <Briefcase className="h-16 w-16 text-[#3b82f6] mx-auto mb-4" />
-          <p className="text-xl text-[#111827] font-bold">
-            No OpenAI business history found.
-          </p>
-          <p className="text-base text-[#2d3748] mt-2">
-            Submit business information to see your history here!
-          </p>
-        </motion.div>
-      ) : (
-        <div className="space-y-4">
-          {openaiBusinessHistory.map(
-            (item: SearchHistoryAiItem, index: number) => (
-              <motion.div
-                key={item.id}
-                className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between transform transition-all duration-300 hover:shadow-md hover:scale-[1.005]"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}>
-                <div className="flex items-start sm:items-center gap-3 w-full sm:w-auto">
-                  <div className="p-2 bg-[#e0f2fe] rounded-full text-[#3b82f6] flex-shrink-0">
-                    <Briefcase className="h-5 w-5" />
-                  </div>
-                  <div className="flex-grow">
-                    <p className="font-semibold text-lg text-[#111827] mb-0.5">
-                      {item.productName}
-                    </p>
-                    <p className="text-sm text-[#2d3748] mb-0.5">
-                      Category: {item.category}
-                    </p>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 text-xs text-[#2d3748]">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-gray-500" />
-                        Submitted on: {formatTimestamp(item.created_at)}
+                )}
+                {"type" in item && (
+                  <p className="text-xs text-gray-500">Type: {item.type}</p>
+                )}
+                {"promotionGoal" in item && (
+                  <>
+                    <p className="text-sm text-gray-700">
+                      Goal:{" "}
+                      <span className="font-bold text-purple-600">
+                        {item.promotionGoal}
                       </span>
-                      <span className="flex items-center gap-1 mt-0.5 sm:mt-0">
-                        <Clock className="h-3 w-3 text-gray-500" />
-                        Last visited: {formatTimestamp(item.last_visited)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="text-left sm:text-right mt-3 sm:mt-0 sm:ml-auto">
-                  <p className="text-sm font-medium text-[#111827]">
-                    Goal:{" "}
-                    <span className="font-bold text-[#3b82f6]">
-                      {item.promotionGoal}
-                    </span>
-                  </p>
-                  <p className="text-xs text-[#2d3748]/80">
-                    Location: {item.location}
-                  </p>
-                </div>
-              </motion.div>
-            )
-          )}
-        </div>
-      );
-    }
-    return null;
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Location: {item.location}
+                    </p>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          )
+        )}
+      </div>
+    );
   };
 
   return (
-    <div className="pt-32 pb-20 min-h-screen bg-gradient-to-br from-[#e0f2fe] to-[#bfdbfe] p-4 font-inter">
-      <div className="max-w-3xl mx-auto">
+    <div className="pt-32 pb-20 min-h-screen bg-gradient-to-br from-[#f1f5f9] to-[rgba(124,58,237,0.07)] px-4 font-inter relative">
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
         <motion.div
-          className="flex items-center mb-6"
+          className="flex items-center mb-10 gap-4"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}>
           <motion.button
-            onClick={() => navigate("/profile")}
-            className="mr-3 p-2 rounded-full bg-[#e0f2fe] hover:bg-[#cce8ff] transition-all duration-200 shadow-md"
+            onClick={handleGoBack}
+            className="p-2 rounded-full bg-blue-100 hover:bg-blue-200 transition shadow-md"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}>
-            <ArrowLeft className="h-5 w-5 text-[#3b82f6]" />
+            <ArrowLeft className="h-5 w-5 text-blue-600" />
           </motion.button>
-          <h1 className="text-3xl font-extrabold text-[#111827]">History</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">
+            Your Search History
+          </h1>
         </motion.div>
 
-        {/* Tab Navigation */}
-        <div className="flex mb-6 bg-white rounded-xl shadow-md p-1">
+        {/* Tabs */}
+        <div className="flex mb-8 bg-white p-1 rounded-full border border-gray-200 shadow-md max-w-md mx-auto">
           <button
-            className={`flex-1 py-2 px-4 text-center font-semibold rounded-lg transition-colors duration-200 ${
+            onClick={() => setActiveTab("facebook")}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 font-semibold rounded-full transition ${
               activeTab === "facebook"
-                ? "bg-[#3b82f6] text-white shadow-lg"
-                : "text-[#2d3748] hover:bg-gray-100"
-            }`}
-            onClick={() => setActiveTab("facebook")}>
-            Facebook
+                ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}>
+            <Search className="w-4 h-4" />
+            Miner
           </button>
           <button
-            className={`flex-1 py-2 px-4 text-center font-semibold rounded-lg transition-colors duration-200 ${
+            onClick={() => setActiveTab("openai")}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 font-semibold rounded-full transition ${
               activeTab === "openai"
-                ? "bg-[#3b82f6] text-white shadow-lg"
-                : "text-[#2d3748] hover:bg-gray-100"
-            }`}
-            onClick={() => setActiveTab("openai")}>
-            OpenAI
+                ? "bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}>
+            <Briefcase className="w-4 h-4" />
+            Premium
           </button>
         </div>
 
-        {/* Render content based on active tab */}
+        {/* Content */}
         {renderContent()}
+
+        {/* Floating Gradients */}
+        <div className="overflow-hidden">
+          <div className="-z-10 absolute top-[4.2rem] right-2 w-24 h-24 bg-gradient-to-b from-blue-500 to-purple-400 rounded-full opacity-30 animate-float"></div>
+          <div
+            className="-z-10 absolute bottom-4 right-[33rem] w-32 h-32 bg-gradient-to-r from-black to-purple-600 rounded-full opacity-20  animate-float"
+            style={{ animationDelay: "2s" }}></div>
+          <div className="-z-10 absolute bottom-0 left-16 w-48 h-48 bg-gradient-to-t from-purple-500 to-blue-300 rounded-full opacity-30  animate-float"></div>
+          <div className="-z-10 absolute top-48 left-60 w-48 h-48 bg-gradient-to-t from-purple-500 to-blue-600 rounded-full opacity-70  animate-float"></div>
+          <div className="-z-10 absolute top-[20rem] right-[10rem] w-36 h-36 bg-gradient-to-t from-blue-500 to-purple-400 rounded-full opacity-20  animate-float"></div>
+        </div>
       </div>
     </div>
   );

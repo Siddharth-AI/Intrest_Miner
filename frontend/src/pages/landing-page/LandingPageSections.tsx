@@ -17,7 +17,6 @@ import {
   FaSearch,
   FaCog,
   FaCheck,
-  FaQuoteLeft,
   FaComments,
   FaCode,
   FaChartBar,
@@ -42,123 +41,6 @@ const staggerContainer = {
     },
   },
 };
-
-// const Header = () => {
-//   const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-//   const scrollToSection = (sectionId: string) => {
-//     const element = document.getElementById(sectionId);
-//     if (element) {
-//       element.scrollIntoView({ behavior: "smooth" });
-//     }
-//     setIsMenuOpen(false);
-//   };
-
-//   return (
-//     <header className="fixed top-0 left-0 right-0 z-50 glass border-b border-border/20">
-//       <div className="opacity-90 absolute inset-0 bg-gradient-to-br from-[#f1f5f9] to-[rgba(124,58,237,0.01)] shadow-lg" />
-//       <nav className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
-//         <div className="flex justify-between items-center h-[70px]">
-//           {/* Brand */}
-//           <div className="flex items-center space-x-3">
-//             <div
-//               className="w-10 h-10 backdrop-blur-sm rounded-lg flex items-center justify-center border border-white/30"
-//               style={{
-//                 background: `linear-gradient(135deg, hsl(221.2, 83.2%, 53.3%) 0%, hsl(262.1, 83.3%, 57.8%) 100%)`,
-//               }}>
-//               <Pickaxe className="w-6 h-6 text-white rounded-lg" />
-//             </div>
-//             <span
-//               className="text-2xl font-bold"
-//               style={{
-//                 background: `linear-gradient(135deg, hsl(221.2, 83.2%, 53.3%) 0%, hsl(262.1, 83.3%, 57.8%) 100%)`,
-//                 WebkitBackgroundClip: "text",
-//                 WebkitTextFillColor: "transparent",
-//               }}>
-//               Interest-Miner
-//             </span>
-//           </div>
-
-//           {/* Desktop Navigation */}
-//           <div className="hidden md:flex items-center space-x-8">
-//             <button
-//               onClick={() => scrollToSection("features")}
-//               className="text-gray-500 hover:text-blue-400 transition-colors font-medium">
-//               Features
-//             </button>
-//             <button
-//               onClick={() => scrollToSection("pricing")}
-//               className="text-gray-500 hover:text-blue-400 transition-colors font-medium">
-//               Pricing
-//             </button>
-//             <button
-//               onClick={() => scrollToSection("testimonials")}
-//               className="text-gray-500 hover:text-blue-400 transition-colors font-medium">
-//               Reviews
-//             </button>
-//             <a
-//               href="/login"
-//               className="text-gray-500 hover:text-blue-400 transition-colors">
-//               <Button
-//                 className="bg-white/20 hover:bg-white/30 text-white border border-white/30 hover:border-white/50 backdrop-blur-sm hover:shadow-lg transition-all transform "
-//                 style={{
-//                   background: `linear-gradient(135deg, hsl(221.2, 83.2%, 53.3%) 0%, hsl(262.1, 83.3%, 57.8%) 100%)`,
-//                 }}>
-//                 Start Free Trial
-//               </Button>
-//             </a>
-//           </div>
-
-//           {/* Mobile Menu Button */}
-//           <button
-//             className="md:hidden p-2 text-white hover:bg-white/20 rounded-lg transition-colors"
-//             onClick={() => setIsMenuOpen(!isMenuOpen)}>
-//             {isMenuOpen ? (
-//               <X className="w-6 h-6" />
-//             ) : (
-//               <Menu className="w-6 h-6" />
-//             )}
-//           </button>
-//         </div>
-
-//         {/* Mobile Menu */}
-//         {isMenuOpen && (
-//           <div className="md:hidden border-t border-white/20 py-4 space-y-4 bg-black/20 backdrop-blur-sm rounded-b-lg mt-2">
-//             <button
-//               onClick={() => scrollToSection("features")}
-//               className="block w-full text-left px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 transition-colors rounded-lg mx-2">
-//               Features
-//             </button>
-//             <button
-//               onClick={() => scrollToSection("pricing")}
-//               className="block w-full text-left px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 transition-colors rounded-lg mx-2">
-//               Pricing
-//             </button>
-//             <button
-//               onClick={() => scrollToSection("testimonials")}
-//               className="block w-full text-left px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 transition-colors rounded-lg mx-2">
-//               Reviews
-//             </button>
-//             <div className="px-4 space-y-3 pt-2">
-//               <a href="/login" className="block">
-//                 <Button
-//                   variant="ghost"
-//                   className="w-full text-white hover:bg-white/20 border border-white/30 hover:border-white/50">
-//                   Sign In
-//                 </Button>
-//               </a>
-//               <a href="/login" className="block">
-//                 <Button className="w-full bg-white/20 hover:bg-white/30 text-white border border-white/30 hover:border-white/50 backdrop-blur-sm">
-//                   Start Free Trial
-//                 </Button>
-//               </a>
-//             </div>
-//           </div>
-//         )}
-//       </nav>
-//     </header>
-//   );
-// };
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -345,16 +227,16 @@ const HeroSection = () => {
                 variants={fadeInUp}
                 className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-12">
                 <Link to="/login">
-                <Button
-                  size="lg"
-                  className="text-white hover:shadow-xl transition-all transform hover:scale-105 text-lg px-8 py-4"
-                  style={{
-                    background: `linear-gradient(135deg, hsl(221.2, 83.2%, 53.3%) 0%, hsl(262.1, 83.3%, 57.8%) 100%)`,
-                  }}>
-                  <Rocket className="w-5 h-5 mr-2" />
-                  Start Free Trial
-                </Button>
-                  </Link>
+                  <Button
+                    size="lg"
+                    className="text-white hover:shadow-xl transition-all transform hover:scale-105 text-lg px-8 py-4"
+                    style={{
+                      background: `linear-gradient(135deg, hsl(221.2, 83.2%, 53.3%) 0%, hsl(262.1, 83.3%, 57.8%) 100%)`,
+                    }}>
+                    <Rocket className="w-5 h-5 mr-2" />
+                    Start Free Trial
+                  </Button>
+                </Link>
                 <Button
                   variant="outline"
                   size="lg"
@@ -502,12 +384,14 @@ const HeroSection = () => {
               </div>
             </div>
           </motion.div>
+          <div className="overflow-hidden">
+            <div className="-z-10 absolute top-[4.2rem] right-2 w-24 h-24 bg-gradient-to-b from-blue-500 to-purple-400 rounded-full opacity-30 animate-float"></div>
+            <div
+              className="-z-10 absolute bottom-4 right-[33rem] w-32 h-32 bg-gradient-to-r from-black to-purple-600 rounded-full opacity-20 animate-float"
+              style={{ animationDelay: "2s" }}></div>
+          </div>
 
           {/* Floating Elements */}
-          <div className="-z-10 absolute top-[4.2rem] right-2 w-24 h-24 bg-gradient-to-b from-blue-500 to-purple-400 rounded-full opacity-30 animate-float"></div>
-          <div
-            className="-z-10 absolute bottom-4 right-[33rem] w-32 h-32 bg-gradient-to-r from-black to-purple-600 rounded-full opacity-20 animate-float"
-            style={{ animationDelay: "2s" }}></div>
         </div>
       </div>
     </section>
@@ -812,7 +696,9 @@ const SuccessStoriesSection = () => {
   ];
 
   return (
-    <section className="py-20 bg-gradient-to-br from-[#f1f5f9] to-[rgba(124,58,237,0.11)]" id="growth">
+    <section
+      className="py-20 bg-gradient-to-br from-[#f1f5f9] to-[rgba(124,58,237,0.11)]"
+      id="growth">
       <div className="container mx-auto px-4">
         <motion.div
           ref={ref}

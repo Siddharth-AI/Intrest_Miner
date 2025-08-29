@@ -1,8 +1,6 @@
-import LoginForm from "@/components/LoginForm";
+import LoginForm from "@/components/forms/LoginForm";
 import { Button } from "@/components/ui/button";
 import { Menu, Pickaxe, X } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router-dom";
 
 const Login = () => {
   return (

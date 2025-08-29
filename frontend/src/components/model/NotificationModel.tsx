@@ -1,9 +1,9 @@
-
 "use client";
 
 import type React from "react";
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { Audio, DNA } from "react-loader-spinner";
 import {
   Bell,
   Check,
@@ -42,7 +42,7 @@ type GroupedNotifications = {
   [key: string]: Notification[];
 };
 
-const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
+const NotificationModel: React.FC<NotificationDropdownProps> = ({
   isOpen,
   onClose,
   triggerRef,
@@ -448,10 +448,14 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                   className={`flex flex-col items-center justify-center ${
                     isMobile ? "py-20" : "py-12"
                   }`}>
-                  <div className="w-10 h-10 border-4 border-[#3b82f6]/30 border-t-[#3b82f6] rounded-full animate-spin"></div>
-                  <p className="text-[#2d3748] mt-4 text-sm">
-                    Loading notifications...
-                  </p>
+                  <DNA
+                    visible={true}
+                    height="80"
+                    width="80"
+                    ariaLabel="dna-loading"
+                    wrapperStyle={{}}
+                    wrapperClass="dna-wrapper"
+                  />
                 </div>
               ) : filteredNotifications.length === 0 ? (
                 <div
@@ -634,4 +638,4 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   );
 };
 
-export default NotificationDropdown;
+export default NotificationModel;

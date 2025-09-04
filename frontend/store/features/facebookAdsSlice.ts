@@ -294,6 +294,40 @@ const facebookAdsSlice = createSlice({
   initialState,
   reducers: {
     // Filter actions
+    // In your facebookAdsSlice.ts, add this new action in the reducers section:
+
+    clearAllData: (state) => {
+      // Reset to initial state
+      state.adAccounts = [];
+      state.campaigns = [];
+      state.insights = [];
+      state.campaignInsights = [];
+      state.aggregatedStats = null;
+      state.analysis = {
+        campaignAnalyses: [],
+        historicalTrend: [],
+        futurePrediction: null,
+      };
+      state.selectedAccount = '';
+      state.selectedCampaign = '';
+      state.dateFilter = 'this_year';
+      state.customDateRange = { since: '', until: '' };
+      state.searchTerm = '';
+      state.statusFilter = 'all';
+      state.loading = false;
+      state.initialLoading = true;
+      state.showModal = false;
+      state.showCustomDatePicker = false;
+      state.showAnalyticsModal = false;
+      state.selectedCampaignForModal = null;
+      state.error = null;
+      state.lastUpdated = null;
+
+      // Clear Facebook access token
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('FB_ACCESS_TOKEN');
+      }
+    },
     setSelectedAccount: (state, action: PayloadAction<string>) => {
       state.selectedAccount = action.payload;
       state.campaigns = [];
@@ -441,6 +475,7 @@ export const {
   calculateStats,
   setShowAnalyticsModal,
   setAnalysisResults,
+  clearAllData,
 } = facebookAdsSlice.actions;
 
 export default facebookAdsSlice.reducer;

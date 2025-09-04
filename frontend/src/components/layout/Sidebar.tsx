@@ -15,6 +15,8 @@ import {
   LogOut,
   X,
 } from "lucide-react";
+
+import { clearAllData } from "../../../store/features/facebookAdsSlice";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { openPricingModal } from "../../../store/features/pricingModalSlice";
@@ -22,6 +24,7 @@ import { resetSearchState } from "../../../store/features/facebookSlice";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import { GiMiner } from "react-icons/gi";
 import { FaMoneyBillWave } from "react-icons/fa";
+import { logout } from "../../../store/features/loginSlice";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -101,7 +104,19 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, isCollapsed }) => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.clear();
+    // Clear authentication token
+    localStorage.removeItem("token");
+
+    // Clear Facebook data and token
+    dispatch(clearAllData());
+
+    // Reset other states if needed
+    dispatch(resetSearchState());
+
+    // Logout user
+    dispatch(logout());
+
+    // Navigate to home
     router("/");
     setShowUserMenu(false);
   };

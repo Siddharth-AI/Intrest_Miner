@@ -338,14 +338,11 @@ const CampaignModal: React.FC = () => {
                                 <TableCell className="text-right">
                                   <div
                                     className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                                      parseFloat(insight.ctr || "0") * 100 > 1
+                                      parseFloat(insight.ctr || "0") > 1
                                         ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                                         : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
                                     }`}>
-                                    {(
-                                      parseFloat(insight.ctr || "0") * 100
-                                    ).toFixed(2)}
-                                    %
+                                    {parseFloat(insight.ctr).toFixed(2)}%
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right font-medium">

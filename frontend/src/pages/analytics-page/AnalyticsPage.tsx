@@ -84,6 +84,7 @@ import {
   setSelectedCampaignForModal,
   setShowAnalyticsModal,
   setAnalysisResults,
+  clearAllData,
 } from "../../../store/features/facebookAdsSlice";
 import CampaignModal from "@/components/model/CampaignModal";
 import AnalyticsModal from "@/components/model/AnalyticsModal";
@@ -92,21 +93,19 @@ import {
   getHistoricalTrend,
   predictFuturePerformance,
 } from "../../lib/analyticsService";
+import { useNavigate } from "react-router-dom";
 
 const dateFilterOptions = [
+  { value: "maximum", label: "All Time" },
   { value: "today", label: "Today" },
   { value: "yesterday", label: "Yesterday" },
   { value: "last_7d", label: "Last 7 Days" },
   { value: "last_14d", label: "Last 14 Days" },
-  { value: "last_30d", label: "Last 30 Days" },
   { value: "this_month", label: "This Month" },
   { value: "last_month", label: "Last Month" },
   { value: "last_90d", label: "Last 3 Months" },
-  { value: "this_quarter", label: "This Quarter" },
-  { value: "last_quarter", label: "Last Quarter" },
   { value: "this_year", label: "This Year" },
   { value: "last_year", label: "Last Year" },
-  { value: "maximum", label: "All Time" },
   { value: "custom", label: "Custom Range" },
 ];
 
@@ -141,8 +140,17 @@ const AnalyticsPage: React.FC = () => {
     error,
     lastUpdated,
   } = useAppSelector((state) => state.facebookAds);
-
+  const router = useNavigate();
   const [isDarkMode, setIsDarkMode] = React.useState(false);
+
+  const handleDisconnectFacebook = () => {
+    dispatch(clearAllData());
+    toast({
+      title: "Disconnected from Meta",
+      description: "Your Meta account has been disconnected successfully.",
+    });
+    router("/dashboard");
+  };
 
   useEffect(() => {
     const checkTheme = () => {
@@ -194,18 +202,6 @@ const AnalyticsPage: React.FC = () => {
       dispatch(fetchInsights());
     }
   }, [selectedAccount, dateFilter, customDateRange, dispatch]);
-
-  useEffect(() => {
-    if (error) {
-      toast({
-        title: "Error",
-        description: error,
-        variant: "destructive",
-      });
-      // Assuming you have a `clearError` action
-      // dispatch(clearError());
-    }
-  }, [error, toast, dispatch]);
 
   const handleAccountChange = (accountId: string) => {
     dispatch(setSelectedAccount(accountId));
@@ -665,6 +661,13 @@ const AnalyticsPage: React.FC = () => {
               <Zap className="h-5 w-5 mr-2" />
               Analyze Performance
             </Button>
+            <Button
+              onClick={handleDisconnectFacebook}
+              disabled={loading}
+              className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold rounded-lg shadow-lg px-6 py-2 transition active:scale-95">
+              <X className="h-5 w-5 mr-2" />
+              Disconnect Meta
+            </Button>
           </div>
         </motion.div>
 
@@ -706,7 +709,7 @@ const AnalyticsPage: React.FC = () => {
               },
               {
                 title: "Average CTR",
-                value: `${(aggregatedStats.avgCTR * 100).toFixed(2)}%`,
+                value: `${aggregatedStats.avgCTR.toFixed(2)}%`,
                 icon: TrendingUp,
                 gradient: "from-amber-500 to-amber-600",
                 bgGradient:

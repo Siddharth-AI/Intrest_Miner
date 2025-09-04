@@ -1,6 +1,6 @@
 // components/Dashboard.tsx
 import React, { useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   EyeIcon,
   ChartBarIcon,
@@ -53,7 +53,7 @@ const Dashboard: React.FC = () => {
   } = useAppSelector((state) => state.facebookAds);
 
   const [isDarkMode, setIsDarkMode] = React.useState(false);
-
+  const router = useNavigate();
   // Handle token from OAuth redirect
   useEffect(() => {
     const hash = window.location.hash;
@@ -79,6 +79,9 @@ const Dashboard: React.FC = () => {
       }
     }
   }, [dispatch, adAccounts.length]);
+
+  const token = localStorage.getItem("FB_ACCESS_TOKEN");
+  const hasToken = Boolean(token);
 
   // Auto-fetch campaigns when selectedAccount changes
   useEffect(() => {
@@ -142,17 +145,6 @@ const Dashboard: React.FC = () => {
       dispatch(fetchAdAccounts());
     }
   }, [selectedAccount, adAccounts.length, dispatch, toast]);
-
-  // Show error toast when error occurs
-  useEffect(() => {
-    if (error) {
-      toast({
-        title: "Error",
-        description: error,
-        variant: "destructive",
-      });
-    }
-  }, [error, toast]);
 
   // Theme detection
   useEffect(() => {
@@ -365,433 +357,464 @@ const Dashboard: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Enhanced Welcome Header */}
-        <motion.div
-          className="mb-8"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}>
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent">
-                Welcome back! 👋
-              </h1>
-              <p className="text-gray-600 dark:text-gray-300 text-lg">
-                Here's an overview of your InterestMiner performance and Meta
-                Ads data.
-              </p>
-            </div>
-            <motion.div
-              className="hidden md:flex md:gap-4 "
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.3, type: "spring" }}>
-              <div className="flex flex-col gap-2">
-                {/* Ad Account Selector */}
-                {adAccounts.length > 0 && (
-                  <Select
-                    value={selectedAccount}
-                    onValueChange={handleAccountChange}>
-                    <SelectTrigger className="w-[250px] bg-white dark:bg-gray-800">
-                      <UsersIcon className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="Select Ad Account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {adAccounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          <div className="flex items-center justify-between w-full">
-                            <span>{account.name}</span>
-                            <Badge variant="secondary" className="ml-2">
-                              {account.currency}
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+    <div className="relative ">
+      <div
+        className={`${
+          !hasToken
+            ? "blur-sm pointer-events-none p-6"
+            : "min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6"
+        }`}>
+        <div className="max-w-7xl mx-auto">
+          {/* Enhanced Welcome Header */}
+          <motion.div
+            className="mb-8"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent">
+                  Welcome back! 👋
+                </h1>
+                <p className="text-gray-600 dark:text-gray-300 text-lg">
+                  Here's an overview of your InterestMiner performance and Meta
+                  Ads data.
+                </p>
               </div>
-              {/* Status and Refresh */}
-              <div className="flex items-center gap-2">
-                <div className="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium flex-1">
-                  <ClockIcon className="w-4 h-4" />
-                  <span>
-                    {loading
-                      ? "Loading..."
-                      : lastUpdated
-                      ? `Updated: ${new Date(lastUpdated).toLocaleTimeString(
-                          "en-IN"
-                        )}`
-                      : "Connect to sync data"}
-                  </span>
-                </div>
-                <Button
-                  onClick={handleRefresh}
-                  disabled={loading}
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0">
-                  <ArrowPathIcon
-                    className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-                  />
-                </Button>
-              </div>
-            </motion.div>
-          </div>
-        </motion.div>
-
-        {/* Enhanced Stats Grid */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          {stats.map((item, index) => (
-            <motion.div
-              key={item.name}
-              className={`relative overflow-hidden bg-gradient-to-r ${item.bgGradient} rounded-2xl p-6 border border-white/20 dark:border-gray-700/50 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
-              whileHover={{ scale: 1.02, y: -5 }}>
-              {/* Gradient overlay */}
-              <div
-                className={`absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}
-              />
-
-              <div className="relative">
-                <div className="flex items-center justify-between mb-4">
-                  <motion.div
-                    className={`w-12 h-12 bg-gradient-to-r ${item.gradient} rounded-xl flex items-center justify-center shadow-lg`}
-                    whileHover={{ scale: 1.1, rotate: 5 }}>
-                    <item.icon className="h-6 w-6 text-white" />
-                  </motion.div>
-                  {item.changeType === "increase" && (
-                    <motion.div
-                      className="flex items-center space-x-1 text-emerald-600 dark:text-emerald-400"
-                      animate={{ y: [0, -2, 0] }}
-                      transition={{ duration: 2, repeat: Infinity }}>
-                      <ArrowTrendingUpIcon className="h-4 w-4" />
-                    </motion.div>
-                  )}
-                  {loading && item.name.includes("Data") && (
-                    <motion.div
-                      className="flex items-center space-x-1 text-blue-600 dark:text-blue-400"
-                      animate={{ rotate: 360 }}
-                      transition={{
-                        duration: 1,
-                        repeat: Infinity,
-                        ease: "linear",
-                      }}>
-                      <ArrowPathIcon className="h-4 w-4" />
-                    </motion.div>
+              <motion.div
+                className="hidden md:flex md:gap-4 "
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.3, type: "spring" }}>
+                <div className="flex flex-col gap-2">
+                  {/* Ad Account Selector */}
+                  {adAccounts.length > 0 && (
+                    <Select
+                      value={selectedAccount}
+                      onValueChange={handleAccountChange}>
+                      <SelectTrigger className="w-[250px] bg-white dark:bg-gray-800">
+                        <UsersIcon className="h-4 w-4 mr-2" />
+                        <SelectValue placeholder="Select Ad Account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {adAccounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            <div className="flex items-center justify-between w-full">
+                              <span>{account.name}</span>
+                              <Badge variant="secondary" className="ml-2">
+                                {account.currency}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   )}
                 </div>
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                    {item.name}
-                  </p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                    {item.value}
-                  </p>
-                  <div className="flex items-center space-x-2">
-                    <span
-                      className={`text-sm font-medium ${
-                        item.changeType === "increase"
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : item.changeType === "warning"
-                          ? "text-orange-600 dark:text-orange-400"
-                          : "text-gray-600 dark:text-gray-400"
-                      }`}>
-                      {item.change}
+                {/* Status and Refresh */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium flex-1">
+                    <ClockIcon className="w-4 h-4" />
+                    <span>
+                      {loading
+                        ? "Loading..."
+                        : lastUpdated
+                        ? `Updated: ${new Date(lastUpdated).toLocaleTimeString(
+                            "en-IN"
+                          )}`
+                        : "Connect to sync data"}
                     </span>
                   </div>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Enhanced Action Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {quickActions.map((action, index) => (
-            <motion.div
-              key={action.title}
-              className={`relative overflow-hidden bg-gradient-to-br ${action.bgGradient} rounded-2xl p-8 border border-white/20 dark:border-gray-700/50 backdrop-blur-sm group hover:shadow-2xl transition-all duration-300`}
-              initial={{ opacity: 0, x: index === 0 ? -50 : 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 + index * 0.1 }}
-              whileHover={{ scale: 1.02 }}>
-              {/* Animated background */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-              <div className="relative">
-                <div className="flex items-center mb-6">
-                  <motion.div
-                    className={`w-14 h-14 bg-gradient-to-r ${action.gradient} rounded-xl flex items-center justify-center mr-4 shadow-lg`}
-                    whileHover={{ scale: 1.1, rotate: 10 }}>
-                    <action.icon className="w-7 h-7 text-white" />
-                  </motion.div>
-                  <div className="flex items-center space-x-3">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                      {action.title}
-                    </h3>
-                    {action.badge && (
-                      <motion.span
-                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium shadow-lg ${
-                          aggregatedStats
-                            ? "bg-emerald-500 text-white"
-                            : "bg-orange-500 text-white"
-                        }`}
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{
-                          delay: 0.6 + index * 0.1,
-                          type: "spring",
-                        }}>
-                        {action.badge}
-                      </motion.span>
-                    )}
-                  </div>
-                </div>
-
-                <p className="text-gray-600 dark:text-gray-300 mb-6 text-base leading-relaxed">
-                  {action.description}
-                </p>
-
-                <Link to={action.link}>
-                  <motion.button
-                    className={`inline-flex items-center px-6 py-3 bg-gradient-to-r ${action.gradient} text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 group/btn`}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.98 }}>
-                    <span>{action.buttonText}</span>
-                    <ArrowUpRightIcon className="ml-2 h-5 w-5 group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform duration-200" />
-                  </motion.button>
-                </Link>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Enhanced Bottom Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Enhanced Recent Activity */}
-          <motion.div
-            className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-white/20 dark:border-gray-700/50 shadow-xl"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.6 }}>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                  Recent Activity
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Your latest campaign updates and data sync
-                </p>
-              </div>
-              <motion.div
-                className={`w-2 h-2 rounded-full ${
-                  loading
-                    ? "bg-blue-500"
-                    : aggregatedStats
-                    ? "bg-green-500"
-                    : "bg-orange-500"
-                }`}
-                animate={{
-                  scale: [1, 1.5, 1],
-                  opacity: [0.5, 1, 0.5],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-            </div>
-
-            <div className="space-y-6">
-              {recentActivity.map((activity, index) => (
-                <motion.div
-                  key={activity.id}
-                  className="flex items-start space-x-4 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200 group"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.4, delay: 0.8 + index * 0.1 }}>
-                  <motion.div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      activity.status === "completed"
-                        ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
-                        : activity.status === "improved"
-                        ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                        : "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
-                    }`}
-                    whileHover={{ scale: 1.1 }}>
-                    <activity.icon className="w-5 h-5" />
-                  </motion.div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                      {activity.action}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {activity.time}
-                    </p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-
-          {/* Enhanced Account Usage */}
-          <motion.div
-            className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-white/20 dark:border-gray-700/50 shadow-xl"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.7 }}>
-            <div className="mb-6">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                Account Overview
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Meta Ads connection status and data
-              </p>
-            </div>
-
-            <div className="space-y-6">
-              {/* Enhanced Progress Bars */}
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Connected Accounts
-                  </span>
-                  <span className="text-sm font-bold text-gray-900 dark:text-white">
-                    {adAccounts.length}
-                  </span>
-                </div>
-                <div className="relative">
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                    <motion.div
-                      className="bg-gradient-to-r from-blue-500 to-cyan-500 h-3 rounded-full shadow-sm"
-                      initial={{ width: 0 }}
-                      animate={{ width: adAccounts.length > 0 ? "100%" : "0%" }}
-                      transition={{
-                        duration: 1.5,
-                        delay: 0.8,
-                        ease: "easeOut",
-                      }}
+                  <Button
+                    onClick={handleRefresh}
+                    disabled={loading}
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0">
+                    <ArrowPathIcon
+                      className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
                     />
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-cyan-400/20 rounded-full animate-pulse" />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Active Campaigns
-                  </span>
-                  <span className="text-sm font-bold text-gray-900 dark:text-white">
-                    {campaigns.filter((c) => c.status === "ACTIVE").length} /{" "}
-                    {campaigns.length}
-                  </span>
-                </div>
-                <div className="relative">
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                    <motion.div
-                      className="bg-gradient-to-r from-emerald-500 to-green-500 h-3 rounded-full shadow-sm"
-                      initial={{ width: 0 }}
-                      animate={{
-                        width:
-                          campaigns.length > 0
-                            ? `${
-                                (campaigns.filter((c) => c.status === "ACTIVE")
-                                  .length /
-                                  campaigns.length) *
-                                100
-                              }%`
-                            : "0%",
-                      }}
-                      transition={{ duration: 1.5, delay: 1, ease: "easeOut" }}
-                    />
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 to-green-400/20 rounded-full animate-pulse" />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Data Insights
-                  </span>
-                  <span className="text-sm font-bold text-gray-900 dark:text-white">
-                    {insights.length}
-                  </span>
-                </div>
-                <div className="relative">
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                    <motion.div
-                      className={`h-3 rounded-full shadow-sm ${
-                        insights.length > 0
-                          ? "bg-gradient-to-r from-purple-500 to-pink-500"
-                          : "bg-gradient-to-r from-gray-400 to-gray-500"
-                      }`}
-                      initial={{ width: 0 }}
-                      animate={{
-                        width: insights.length > 0 ? "100%" : "20%",
-                      }}
-                      transition={{
-                        duration: 1.5,
-                        delay: 1.2,
-                        ease: "easeOut",
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Enhanced Connection Status Card */}
-              <motion.div
-                className={`p-6 bg-gradient-to-r ${
-                  adAccounts.length > 0
-                    ? "from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20"
-                    : "from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20"
-                } rounded-xl border ${
-                  adAccounts.length > 0
-                    ? "border-green-200 dark:border-green-800/30"
-                    : "border-orange-200 dark:border-orange-800/30"
-                }`}
-                whileHover={{ scale: 1.02 }}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">
-                      Meta Ads Status
-                    </p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      {adAccounts.length > 0
-                        ? `${adAccounts.length} account(s) • ${campaigns.length} campaigns • ${insights.length} insights`
-                        : "Not connected - Click to connect"}
-                    </p>
-                  </div>
-                  <Link
-                    to={
-                      adAccounts.length > 0 ? "/analytics" : "/meta-campaign"
-                    }>
-                    <motion.button
-                      className={`px-4 py-2 text-sm font-medium text-white bg-gradient-to-r ${
-                        adAccounts.length > 0
-                          ? "from-green-500 to-emerald-500"
-                          : "from-orange-500 to-yellow-500"
-                      } rounded-lg hover:shadow-lg transition-all duration-200`}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.98 }}>
-                      {adAccounts.length > 0 ? "View Analytics" : "Connect"}
-                    </motion.button>
-                  </Link>
+                  </Button>
                 </div>
               </motion.div>
             </div>
           </motion.div>
+
+          {/* Enhanced Stats Grid */}
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+            {stats.map((item, index) => (
+              <motion.div
+                key={item.name}
+                className={`relative overflow-hidden bg-gradient-to-r ${item.bgGradient} rounded-2xl p-6 border border-white/20 dark:border-gray-700/50 backdrop-blur-sm hover:shadow-xl transition-all duration-300 group`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+                whileHover={{ scale: 1.02, y: -5 }}>
+                {/* Gradient overlay */}
+                <div
+                  className={`absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}
+                />
+
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <motion.div
+                      className={`w-12 h-12 bg-gradient-to-r ${item.gradient} rounded-xl flex items-center justify-center shadow-lg`}
+                      whileHover={{ scale: 1.1, rotate: 5 }}>
+                      <item.icon className="h-6 w-6 text-white" />
+                    </motion.div>
+                    {item.changeType === "increase" && (
+                      <motion.div
+                        className="flex items-center space-x-1 text-emerald-600 dark:text-emerald-400"
+                        animate={{ y: [0, -2, 0] }}
+                        transition={{ duration: 2, repeat: Infinity }}>
+                        <ArrowTrendingUpIcon className="h-4 w-4" />
+                      </motion.div>
+                    )}
+                    {loading && item.name.includes("Data") && (
+                      <motion.div
+                        className="flex items-center space-x-1 text-blue-600 dark:text-blue-400"
+                        animate={{ rotate: 360 }}
+                        transition={{
+                          duration: 1,
+                          repeat: Infinity,
+                          ease: "linear",
+                        }}>
+                        <ArrowPathIcon className="h-4 w-4" />
+                      </motion.div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                      {item.name}
+                    </p>
+                    <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                      {item.value}
+                    </p>
+                    <div className="flex items-center space-x-2">
+                      <span
+                        className={`text-sm font-medium ${
+                          item.changeType === "increase"
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : item.changeType === "warning"
+                            ? "text-orange-600 dark:text-orange-400"
+                            : "text-gray-600 dark:text-gray-400"
+                        }`}>
+                        {item.change}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Enhanced Action Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            {quickActions.map((action, index) => (
+              <motion.div
+                key={action.title}
+                className={`relative overflow-hidden bg-gradient-to-br ${action.bgGradient} rounded-2xl p-8 border border-white/20 dark:border-gray-700/50 backdrop-blur-sm group hover:shadow-2xl transition-all duration-300`}
+                initial={{ opacity: 0, x: index === 0 ? -50 : 50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.4 + index * 0.1 }}
+                whileHover={{ scale: 1.02 }}>
+                {/* Animated background */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                <div className="relative">
+                  <div className="flex items-center mb-6">
+                    <motion.div
+                      className={`w-14 h-14 bg-gradient-to-r ${action.gradient} rounded-xl flex items-center justify-center mr-4 shadow-lg`}
+                      whileHover={{ scale: 1.1, rotate: 10 }}>
+                      <action.icon className="w-7 h-7 text-white" />
+                    </motion.div>
+                    <div className="flex items-center space-x-3">
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                        {action.title}
+                      </h3>
+                      {action.badge && (
+                        <motion.span
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium shadow-lg ${
+                            aggregatedStats
+                              ? "bg-emerald-500 text-white"
+                              : "bg-orange-500 text-white"
+                          }`}
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{
+                            delay: 0.6 + index * 0.1,
+                            type: "spring",
+                          }}>
+                          {action.badge}
+                        </motion.span>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="text-gray-600 dark:text-gray-300 mb-6 text-base leading-relaxed">
+                    {action.description}
+                  </p>
+
+                  <Link to={action.link}>
+                    <motion.button
+                      className={`inline-flex items-center px-6 py-3 bg-gradient-to-r ${action.gradient} text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 group/btn`}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.98 }}>
+                      <span>{action.buttonText}</span>
+                      <ArrowUpRightIcon className="ml-2 h-5 w-5 group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform duration-200" />
+                    </motion.button>
+                  </Link>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Enhanced Bottom Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Enhanced Recent Activity */}
+            <motion.div
+              className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-white/20 dark:border-gray-700/50 shadow-xl"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.6 }}>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                    Recent Activity
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Your latest campaign updates and data sync
+                  </p>
+                </div>
+                <motion.div
+                  className={`w-2 h-2 rounded-full ${
+                    loading
+                      ? "bg-blue-500"
+                      : aggregatedStats
+                      ? "bg-green-500"
+                      : "bg-orange-500"
+                  }`}
+                  animate={{
+                    scale: [1, 1.5, 1],
+                    opacity: [0.5, 1, 0.5],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                />
+              </div>
+
+              <div className="space-y-6">
+                {recentActivity.map((activity, index) => (
+                  <motion.div
+                    key={activity.id}
+                    className="flex items-start space-x-4 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200 group"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.4, delay: 0.8 + index * 0.1 }}>
+                    <motion.div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        activity.status === "completed"
+                          ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                          : activity.status === "improved"
+                          ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                          : "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
+                      }`}
+                      whileHover={{ scale: 1.1 }}>
+                      <activity.icon className="w-5 h-5" />
+                    </motion.div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {activity.action}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {activity.time}
+                      </p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+
+            {/* Enhanced Account Usage */}
+            <motion.div
+              className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-white/20 dark:border-gray-700/50 shadow-xl"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.7 }}>
+              <div className="mb-6">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                  Account Overview
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Meta Ads connection status and data
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                {/* Enhanced Progress Bars */}
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                      Connected Accounts
+                    </span>
+                    <span className="text-sm font-bold text-gray-900 dark:text-white">
+                      {adAccounts.length}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                      <motion.div
+                        className="bg-gradient-to-r from-blue-500 to-cyan-500 h-3 rounded-full shadow-sm"
+                        initial={{ width: 0 }}
+                        animate={{
+                          width: adAccounts.length > 0 ? "100%" : "0%",
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          delay: 0.8,
+                          ease: "easeOut",
+                        }}
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-cyan-400/20 rounded-full animate-pulse" />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                      Active Campaigns
+                    </span>
+                    <span className="text-sm font-bold text-gray-900 dark:text-white">
+                      {campaigns.filter((c) => c.status === "ACTIVE").length} /{" "}
+                      {campaigns.length}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                      <motion.div
+                        className="bg-gradient-to-r from-emerald-500 to-green-500 h-3 rounded-full shadow-sm"
+                        initial={{ width: 0 }}
+                        animate={{
+                          width:
+                            campaigns.length > 0
+                              ? `${
+                                  (campaigns.filter(
+                                    (c) => c.status === "ACTIVE"
+                                  ).length /
+                                    campaigns.length) *
+                                  100
+                                }%`
+                              : "0%",
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          delay: 1,
+                          ease: "easeOut",
+                        }}
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 to-green-400/20 rounded-full animate-pulse" />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                      Data Insights
+                    </span>
+                    <span className="text-sm font-bold text-gray-900 dark:text-white">
+                      {insights.length}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                      <motion.div
+                        className={`h-3 rounded-full shadow-sm ${
+                          insights.length > 0
+                            ? "bg-gradient-to-r from-purple-500 to-pink-500"
+                            : "bg-gradient-to-r from-gray-400 to-gray-500"
+                        }`}
+                        initial={{ width: 0 }}
+                        animate={{
+                          width: insights.length > 0 ? "100%" : "20%",
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          delay: 1.2,
+                          ease: "easeOut",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Enhanced Connection Status Card */}
+                <motion.div
+                  className={`p-6 bg-gradient-to-r ${
+                    adAccounts.length > 0
+                      ? "from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20"
+                      : "from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20"
+                  } rounded-xl border ${
+                    adAccounts.length > 0
+                      ? "border-green-200 dark:border-green-800/30"
+                      : "border-orange-200 dark:border-orange-800/30"
+                  }`}
+                  whileHover={{ scale: 1.02 }}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">
+                        Meta Ads Status
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        {adAccounts.length > 0
+                          ? `${adAccounts.length} account(s) • ${campaigns.length} campaigns • ${insights.length} insights`
+                          : "Not connected - Click to connect"}
+                      </p>
+                    </div>
+                    <Link
+                      to={
+                        adAccounts.length > 0 ? "/analytics" : "/meta-campaign"
+                      }>
+                      <motion.button
+                        className={`px-4 py-2 text-sm font-medium text-white bg-gradient-to-r ${
+                          adAccounts.length > 0
+                            ? "from-green-500 to-emerald-500"
+                            : "from-orange-500 to-yellow-500"
+                        } rounded-lg hover:shadow-lg transition-all duration-200`}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}>
+                        {adAccounts.length > 0 ? "View Analytics" : "Connect"}
+                      </motion.button>
+                    </Link>
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          </div>
         </div>
       </div>
+      {!hasToken && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-96 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-8 text-center max-w-md">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              Login Required
+            </h2>
+            <p className="text-gray-600 mb-6">
+              To view your campaign data, please log in with your Meta account.
+            </p>
+            <button
+              onClick={() => router("/meta-campaign")}
+              className="px-6 py-3 bg-purple-600 text-white rounded-full font-semibold shadow-lg hover:bg-purple-700 transition-all duration-200">
+              Go to Meta Login
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

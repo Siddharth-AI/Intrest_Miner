@@ -63,21 +63,6 @@ export default function GuestHeader() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            {/* <button
-              onClick={() => scrollToSection("features")}
-              className="text-gray-500 hover:text-blue-400 transition-colors font-medium">
-              Features
-            </button>
-            <button
-              onClick={() => scrollToSection("growth")}
-              className="text-gray-500 hover:text-blue-400 transition-colors font-medium">
-              Growth
-            </button>
-            <button
-              onClick={() => scrollToSection("testimonials")}
-              className="text-gray-500 hover:text-blue-400 transition-colors font-medium">
-              Reviews
-            </button> */}
             <Link
               to="/login"
               className="text-gray-500 hover:text-blue-400 transition-colors">

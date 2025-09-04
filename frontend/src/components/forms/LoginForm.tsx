@@ -77,7 +77,7 @@ export default function LoginForm() {
         title: "Login Successful!",
         description: `Welcome back, ${login.user.email}`,
       });
-      router("/miner");
+      router("/dashboard");
     } else if (login.error) {
       toast({
         title: "Login Failed",

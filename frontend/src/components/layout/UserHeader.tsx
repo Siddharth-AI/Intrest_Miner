@@ -60,11 +60,6 @@ export default function UserHeader({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const handleLogout = (): void => {
-    localStorage.clear();
-    router("/");
-  };
-
   // Dark mode toggle function
   const toggleTheme = () => {
     const newTheme = !isDarkMode;

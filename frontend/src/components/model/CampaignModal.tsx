@@ -1,3 +1,5 @@
+"use client";
+
 // components/modals/CampaignModal.tsx
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -255,8 +257,9 @@ const CampaignModal: React.FC = () => {
                       <p className="font-semibold text-gray-900 dark:text-gray-100">
                         {selectedCampaignForModal.daily_budget
                           ? formatCurrency(
-                              parseInt(selectedCampaignForModal.daily_budget) /
-                                100
+                              Number.parseInt(
+                                selectedCampaignForModal.daily_budget
+                              ) / 100
                             )
                           : "N/A"}
                       </p>
@@ -300,6 +303,12 @@ const CampaignModal: React.FC = () => {
                               <TableHead className="font-semibold text-right">
                                 CPC
                               </TableHead>
+                              <TableHead className="font-semibold text-right">
+                                CPP
+                              </TableHead>
+                              <TableHead className="font-semibold text-right">
+                                Actions
+                              </TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -322,33 +331,101 @@ const CampaignModal: React.FC = () => {
                                 </TableCell>
                                 <TableCell className="text-right font-medium">
                                   {formatNumber(
-                                    parseInt(insight.impressions || "0")
+                                    Number.parseInt(insight.impressions || "0")
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right font-medium">
                                   {formatNumber(
-                                    parseInt(insight.clicks || "0")
+                                    Number.parseInt(insight.clicks || "0")
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right font-bold text-blue-600 dark:text-blue-400">
                                   {formatCurrency(
-                                    parseFloat(insight.spend || "0")
+                                    Number.parseFloat(insight.spend || "0")
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div
                                     className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                                      parseFloat(insight.ctr || "0") > 1
+                                      Number.parseFloat(insight.ctr || "0") > 1
                                         ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                                         : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
                                     }`}>
-                                    {parseFloat(insight.ctr).toFixed(2)}%
+                                    {Number.parseFloat(insight.ctr).toFixed(2)}%
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right font-medium">
                                   {formatCurrency(
-                                    parseFloat(insight.cpc || "0")
+                                    Number.parseFloat(insight.cpc || "0")
                                   )}
+                                </TableCell>
+                                <TableCell className="text-right font-medium">
+                                  {(() => {
+                                    const purchases =
+                                      insight.actions?.find(
+                                        (action) =>
+                                          action.action_type === "purchase"
+                                      )?.value || "0";
+                                    const spend = Number.parseFloat(
+                                      insight.spend || "0"
+                                    );
+                                    const purchaseCount =
+                                      Number.parseInt(purchases);
+                                    const cpp =
+                                      purchaseCount > 0
+                                        ? spend / purchaseCount
+                                        : 0;
+                                    return formatCurrency(cpp);
+                                  })()}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="space-y-1 text-xs">
+                                    {insight.actions?.map(
+                                      (action, actionIndex) => {
+                                        if (
+                                          [
+                                            "add_to_cart",
+                                            "purchase",
+                                            "initiate_checkout",
+                                            "add_payment_info",
+                                          ].includes(action.action_type)
+                                        ) {
+                                          return (
+                                            <div
+                                              key={actionIndex}
+                                              className="flex justify-between items-center">
+                                              <span className="text-gray-500 dark:text-gray-400 capitalize">
+                                                {action.action_type.replace(
+                                                  /_/g,
+                                                  " "
+                                                )}
+                                                :
+                                              </span>
+                                              <span className="font-medium ml-2">
+                                                {Number.parseInt(
+                                                  action.value || "0"
+                                                ).toLocaleString()}
+                                              </span>
+                                            </div>
+                                          );
+                                        }
+                                        return null;
+                                      }
+                                    )}
+                                    {(!insight.actions ||
+                                      !insight.actions.some((action) =>
+                                        [
+                                          "add_to_cart",
+                                          "purchase",
+                                          "initiate_checkout",
+                                          "add_payment_info",
+                                        ].includes(action.action_type)
+                                      )) && (
+                                      <span className="text-gray-400 italic">
+                                        No actions
+                                      </span>
+                                    )}
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -371,11 +448,13 @@ const CampaignModal: React.FC = () => {
                                       "..."
                                     : insight.adset_name,
                                 fullName: insight.adset_name,
-                                spend: parseFloat(insight.spend || "0"),
-                                clicks: parseInt(insight.clicks || "0"),
+                                spend: Number.parseFloat(insight.spend || "0"),
+                                clicks: Number.parseInt(insight.clicks || "0"),
                                 impressions:
-                                  parseInt(insight.impressions || "0") / 1000,
-                                ctr: parseFloat(insight.ctr || "0") * 100,
+                                  Number.parseInt(insight.impressions || "0") /
+                                  1000,
+                                ctr:
+                                  Number.parseFloat(insight.ctr || "0") * 100,
                               }))}
                               margin={{
                                 top: 20,

@@ -1,3 +1,5 @@
+"use client";
+
 // src/components/model/AnalyticsModal.tsx
 
 import React from "react";
@@ -13,7 +15,6 @@ import {
   X,
   Target,
   Activity,
-  TrendingDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

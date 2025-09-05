@@ -176,6 +176,8 @@ const AnalyticsPage: React.FC = () => {
 
   // Calculate campaign stats
   const campaignStats = useMemo(() => {
+    console.log("Filtered Campaigns:", filteredCampaigns);
+
     return filteredCampaigns.map((campaign) => {
       const campaignInsights = insights.filter(
         (insight) => insight.campaign_id === campaign.id
@@ -185,6 +187,7 @@ const AnalyticsPage: React.FC = () => {
         (acc, insight) => acc + Number.parseFloat(insight.spend || "0"),
         0
       );
+      const daily_budget = campaign.daily_budget;
       const totalClicks = campaignInsights.reduce(
         (acc, insight) => acc + Number.parseInt(insight.clicks || "0"),
         0
@@ -229,6 +232,7 @@ const AnalyticsPage: React.FC = () => {
         ctr,
         cpc,
         roas,
+        daily_budget,
         hasInsights: campaignInsights.length > 0,
       };
     });
@@ -449,7 +453,7 @@ const AnalyticsPage: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* {error && (
+        {error && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -464,7 +468,7 @@ const AnalyticsPage: React.FC = () => {
               <X className="h-4 w-4" />
             </Button>
           </motion.div>
-        )} */}
+        )}
 
         {/* Controls */}
         <div className="mb-8 space-y-4">
@@ -878,80 +882,48 @@ const AnalyticsPage: React.FC = () => {
                         <TableHead>Campaign Name</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Objective</TableHead>
-                        <TableHead className="text-right">Spend</TableHead>
-                        <TableHead className="text-right">Clicks</TableHead>
-                        <TableHead className="text-right">
-                          Impressions
+                        <TableHead className="text-left">
+                          daily_budget
                         </TableHead>
-                        <TableHead className="text-right">CTR</TableHead>
-                        <TableHead className="text-right">CPC</TableHead>
-                        <TableHead className="text-right">ROAS</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {campaignStats.map((campaign, index) => (
-                        <motion.tr
-                          key={campaign.id}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: index * 0.05 }}
-                          className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                          onClick={() => handleCampaignClick(campaign)}>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                                <Target className="h-3 w-3 text-purple-600" />
+                      {campaignStats.map((campaign, index) => {
+                        console.log("Rendering campaign:", campaign);
+                        return (
+                          <motion.tr
+                            key={campaign.id}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: index * 0.05 }}
+                            className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                            onClick={() => handleCampaignClick(campaign)}>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                                  <Target className="h-3 w-3 text-purple-600" />
+                                </div>
+                                <span className="truncate max-w-[200px]">
+                                  {campaign.name}
+                                </span>
                               </div>
-                              <span className="truncate max-w-[200px]">
-                                {campaign.name}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {getStatusBadge(campaign.status)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {campaign.objective?.replace("OUTCOME_", "") ||
-                                "N/A"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-bold text-blue-600 dark:text-blue-400">
-                            {formatCurrency(campaign.totalSpend)}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatNumber(campaign.totalClicks)}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatNumber(campaign.totalImpressions)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div
-                              className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                                campaign.ctr > 1
-                                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                  : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                              }`}>
-                              {campaign.ctr.toFixed(2)}%
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatCurrency(campaign.cpc)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div
-                              className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                                campaign.roas > 2
-                                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                  : campaign.roas > 1
-                                  ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                                  : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                              }`}>
-                              {campaign.roas.toFixed(2)}x
-                            </div>
-                          </TableCell>
-                        </motion.tr>
-                      ))}
+                            </TableCell>
+                            <TableCell>
+                              {getStatusBadge(campaign.status)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {campaign.objective?.replace("OUTCOME_", "") ||
+                                  "N/A"}
+                              </Badge>
+                            </TableCell>
+
+                            <TableCell className="text-left font-medium">
+                              {campaign.daily_budget}
+                            </TableCell>
+                          </motion.tr>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

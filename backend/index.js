@@ -21,6 +21,10 @@ app.use(bodyParser.json());
 // Routes
 app.use("/", router);
 app.use("/facebook", require("./routes/facebookRoutes"));
+app.use("/api/adaccounts", require("./routes/adAccounts"));
+app.use("/api/campaigns", require("./routes/campaigns"));
+app.use("/api/insights", require("./routes/insights"));
+
 
 
 const APP_ID = process.env.FB_APP_ID;
@@ -83,7 +87,6 @@ app.get('/api/auth/facebook/callback', async (req, res) => {
     res.status(500).send('Login failed');
   }
 });
-
 
 // Start server
 const PORT = process.env.PORT || 1000;

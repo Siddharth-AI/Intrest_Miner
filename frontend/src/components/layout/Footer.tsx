@@ -138,7 +138,7 @@ export const Footer: React.FC = () => {
 
   return (
     <>
-      {/* Scroll to Top Button */}
+      {/* Scroll to Top Button
       <motion.button
         className={`fixed bottom-6 right-6 z-50 p-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 ${
           showScrollTop ? "opacity-100 visible" : "opacity-0 invisible"
@@ -152,7 +152,7 @@ export const Footer: React.FC = () => {
           y: showScrollTop ? 0 : 20,
         }}>
         <ArrowUpIcon className="w-5 h-5" />
-      </motion.button>
+      </motion.button> */}
 
       <footer className="relative bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
         {/* Background Pattern */}

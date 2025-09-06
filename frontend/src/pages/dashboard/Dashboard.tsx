@@ -363,6 +363,7 @@ const Dashboard: React.FC = () => {
     adAccounts,
     campaigns,
     campaignInsights,
+    campaignInsightstotal,
     aggregatedStats,
     selectedAccount,
     selectedCampaign,
@@ -398,7 +399,7 @@ const Dashboard: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Enhanced OAuth logic
+  // 🔥 ENHANCED OAuth logic with auto-fetch
   useEffect(() => {
     const hash = window.location.hash;
     if (hash && hash.includes("access_token")) {
@@ -420,6 +421,7 @@ const Dashboard: React.FC = () => {
         });
       }
     } else {
+      // 🔥 AUTO-FETCH: Automatically fetch ad accounts if token exists
       const existingToken = localStorage.getItem("FB_ACCESS_TOKEN");
       if (existingToken && adAccounts.length === 0) {
         dispatch(fetchAdAccounts());
@@ -427,19 +429,43 @@ const Dashboard: React.FC = () => {
     }
   }, [dispatch, adAccounts.length, controls]);
 
-  // Effect hooks remain the same...
+  // 🔥 AUTO-SELECT: First ad account when accounts are loaded
   useEffect(() => {
-    if (selectedCampaign) {
-      dispatch(fetchCampaignInsights(selectedCampaign));
+    if (adAccounts.length > 0 && !selectedAccount) {
+      dispatch(setSelectedAccount(adAccounts[0].id));
+      toast({
+        title: "Account Auto-Selected",
+        description: `Automatically selected: ${adAccounts[0].name}`,
+      });
     }
-  }, [selectedCampaign, dispatch]);
+  }, [adAccounts, selectedAccount, dispatch, toast]);
 
+  // 🔥 AUTO-FETCH: Campaigns when account is selected
   useEffect(() => {
     if (selectedAccount) {
       dispatch(fetchCampaigns(selectedAccount));
     }
   }, [selectedAccount, dispatch]);
 
+  // 🔥 AUTO-SELECT: First campaign when campaigns are loaded
+  useEffect(() => {
+    if (campaigns.length > 0 && !selectedCampaign && selectedAccount) {
+      dispatch(setSelectedCampaign(campaigns[0].id));
+      toast({
+        title: "Campaign Auto-Selected",
+        description: `Automatically selected: ${campaigns[0].name}`,
+      });
+    }
+  }, [campaigns, selectedCampaign, selectedAccount, dispatch, toast]);
+
+  // 🔥 AUTO-FETCH: Campaign insights when campaign is selected
+  useEffect(() => {
+    if (selectedCampaign) {
+      dispatch(fetchCampaignInsights(selectedCampaign));
+    }
+  }, [selectedCampaign, dispatch]);
+
+  // 🔥 AUTO-FETCH: Overall insights when account and campaigns are ready
   useEffect(() => {
     if (selectedAccount && campaigns.length > 0) {
       dispatch(fetchInsights());
@@ -501,9 +527,9 @@ const Dashboard: React.FC = () => {
       connectedAccounts: adAccounts.length,
       totalCampaigns: campaigns.length,
       activeCampaigns: campaigns.filter((c) => c.status === "ACTIVE").length,
-      dataInsights: campaignInsights.length,
+      dataInsights: campaignInsightstotal.length,
     }),
-    [adAccounts.length, campaigns, campaignInsights.length]
+    [adAccounts.length, campaigns, campaignInsightstotal.length]
   );
 
   const formatCurrency = (amount: number) =>

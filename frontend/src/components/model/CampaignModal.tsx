@@ -1,261 +1,393 @@
-"use client";
-
-// components/modals/CampaignModal.tsx
-import React from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// src/components/model/CampaignModal.tsx
+import React, { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  X,
-  Target,
-  Play,
-  DollarSign,
-  Users,
-  BarChart3,
-  RefreshCw,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+  XMarkIcon,
+  ChartBarIcon,
+  EyeIcon,
+  CursorArrowRaysIcon,
+  UsersIcon,
+  CurrencyRupeeIcon,
+  ArrowTrendingUpIcon,
+  CalendarDaysIcon,
+  PlayIcon,
+  PauseIcon,
+  ArchiveBoxIcon,
+  ShoppingCartIcon,
+  CreditCardIcon,
+  BanknotesIcon,
+  ClockIcon,
+  MagnifyingGlassIcon,
+  TableCellsIcon,
+} from "@heroicons/react/24/outline";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import {
   setShowModal,
   fetchCampaignInsights,
 } from "../../../store/features/facebookAdsSlice";
-import Portal from "@/components/ui/Portal"; // Import the Portal component
-
-// Chart colors
-const CHART_COLORS = {
-  tertiary: "#F59E0B",
-  secondary: "#10B981",
-  purple: "#8B5CF6",
-};
+import Portal from "../ui/Portal";
 
 const CampaignModal: React.FC = () => {
   const dispatch = useAppDispatch();
-  const {
-    showModal,
-    selectedCampaignForModal,
-    campaignInsights,
-    dateFilter,
-    customDateRange,
-    loading,
-  } = useAppSelector((state) => state.facebookAds);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState("spend");
+  const [sortOrder, setSortOrder] = useState("desc");
 
-  const [isDarkMode, setIsDarkMode] = React.useState(false);
-
-  // Handle body scroll lock when modal is open/closed
-  React.useEffect(() => {
-    if (showModal) {
-      // Get scrollbar width to prevent layout shift
-      const scrollbarWidth =
-        window.innerWidth - document.documentElement.clientWidth;
-
-      // Prevent body scroll and hide scrollbar
-      document.body.style.overflow = "hidden";
-      document.body.style.paddingRight = `${scrollbarWidth}px`;
-
-      // Also prevent scroll on html element for better compatibility
-      document.documentElement.style.overflow = "hidden";
-    } else {
-      // Restore body scroll
-      document.body.style.overflow = "";
-      document.body.style.paddingRight = "";
-      document.documentElement.style.overflow = "";
-    }
-
-    // Cleanup function to restore scroll when component unmounts
-    return () => {
-      document.body.style.overflow = "";
-      document.body.style.paddingRight = "";
-      document.documentElement.style.overflow = "";
-    };
-  }, [showModal]);
+  const { showModal, selectedCampaignForModal, campaignInsights, loading } =
+    useAppSelector((state) => state.facebookAds);
 
   // Theme detection
-  React.useEffect(() => {
+  useEffect(() => {
     const checkTheme = () => {
-      const isDark = document.documentElement.classList.contains("dark");
-      setIsDarkMode(isDark);
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
     };
+
     checkTheme();
     const observer = new MutationObserver(checkTheme);
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["class"],
     });
+
     return () => observer.disconnect();
   }, []);
 
-  const closeModal = () => {
+  // Fetch campaign insights when modal opens
+  useEffect(() => {
+    if (showModal && selectedCampaignForModal?.id) {
+      dispatch(fetchCampaignInsights(selectedCampaignForModal.id));
+    }
+  }, [showModal, selectedCampaignForModal?.id, dispatch]);
+
+  const handleClose = () => {
     dispatch(setShowModal(false));
+    setSearchTerm("");
+    setSortBy("spend");
+    setSortOrder("desc");
   };
 
-  // Handle Escape key to close modal
-  React.useEffect(() => {
+  // Handle escape key and prevent event bubbling
+  useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape" && showModal) {
-        closeModal();
+        event.preventDefault();
+        event.stopPropagation();
+        handleClose();
       }
     };
 
     if (showModal) {
-      document.addEventListener("keydown", handleEscape);
+      document.addEventListener("keydown", handleEscape, true);
+      // Prevent body scroll
+      document.body.style.overflow = "hidden";
     }
 
     return () => {
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("keydown", handleEscape, true);
+      document.body.style.overflow = "";
     };
   }, [showModal]);
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      active: {
-        className:
-          "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
-        icon: <Play className="h-3 w-3 mr-1" />,
-      },
-      paused: {
-        className:
-          "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800",
-        icon: <Play className="h-3 w-3 mr-1" />,
-      },
-      deleted: {
-        className:
-          "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800",
-        icon: <X className="h-3 w-3 mr-1" />,
-      },
-    };
-
-    const config =
-      statusConfig[status.toLowerCase() as keyof typeof statusConfig] ||
-      statusConfig.paused;
-
-    return (
-      <Badge className={config.className}>
-        {config.icon}
-        {status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()}
-      </Badge>
-    );
-  };
-
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | string) => {
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(numAmount);
   };
 
-  const formatNumber = (num: number) => {
-    if (num >= 1000000) {
-      return (num / 1000000).toFixed(1) + "M";
-    } else if (num >= 1000) {
-      return (num / 1000).toFixed(1) + "K";
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString("en-IN", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status?.toUpperCase()) {
+      case "ACTIVE":
+        return <PlayIcon className="h-4 w-4 text-emerald-600" />;
+      case "PAUSED":
+        return <PauseIcon className="h-4 w-4 text-yellow-600" />;
+      case "ARCHIVED":
+        return <ArchiveBoxIcon className="h-4 w-4 text-gray-600" />;
+      default:
+        return <XMarkIcon className="h-4 w-4 text-red-600" />;
     }
-    return new Intl.NumberFormat("en-IN").format(num);
   };
 
-  if (!selectedCampaignForModal) return null;
+  const getStatusColor = (status: string) => {
+    switch (status?.toUpperCase()) {
+      case "ACTIVE":
+        return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+      case "PAUSED":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+      case "ARCHIVED":
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
+      default:
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+    }
+  };
+
+  // Process campaign insights data - FIXED TYPE ISSUES
+  const processedData = useMemo(() => {
+    // Check if campaignInsights is the full response object or just array
+    if (!campaignInsights) {
+      return { totals: null, insights: [] };
+    }
+
+    // If campaignInsights is the full response object (with totals and insights properties)
+    if (
+      typeof campaignInsights === "object" &&
+      "totals" in campaignInsights &&
+      "insights" in campaignInsights
+    ) {
+      return {
+        totals: campaignInsights.totals as any,
+        insights: (campaignInsights as any).insights || [],
+      };
+    }
+
+    // If campaignInsights is just an array (fallback)
+    if (Array.isArray(campaignInsights)) {
+      return {
+        totals: null,
+        insights: campaignInsights,
+      };
+    }
+
+    return { totals: null, insights: [] };
+  }, [campaignInsights]);
+
+  // Filter and sort insights
+  const filteredInsights = useMemo(() => {
+    if (!processedData.insights || !Array.isArray(processedData.insights))
+      return [];
+
+    const filtered = processedData.insights.filter(
+      (insight: any) =>
+        insight.adset_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        insight.ad_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Sort insights
+    filtered.sort((a: any, b: any) => {
+      const aVal = parseFloat(a[sortBy] || "0");
+      const bVal = parseFloat(b[sortBy] || "0");
+      return sortOrder === "desc" ? bVal - aVal : aVal - bVal;
+    });
+
+    return filtered;
+  }, [processedData.insights, searchTerm, sortBy, sortOrder]);
+
+  // Extract action values for specific actions
+  const getActionValue = (insight: any, actionType: string) => {
+    if (!insight.action_values) return "₹0";
+    const action = insight.action_values.find(
+      (a: any) => a.action_type === actionType
+    );
+    return action ? formatCurrency(parseFloat(action.value)) : "₹0";
+  };
+
+  // Stats cards for campaign totals
+  const statsCards = useMemo(() => {
+    if (!processedData.totals) return [];
+
+    const totals = processedData.totals as any;
+
+    return [
+      {
+        title: "Total Impressions",
+        value: totals.impressions?.toLocaleString() || "0",
+        icon: EyeIcon,
+        color: "from-blue-500 to-blue-600",
+        bgColor: "bg-blue-50 dark:bg-blue-900/20",
+        textColor: "text-blue-600 dark:text-blue-400",
+      },
+      {
+        title: "Total Clicks",
+        value: totals.clicks?.toLocaleString() || "0",
+        icon: CursorArrowRaysIcon,
+        color: "from-emerald-500 to-emerald-600",
+        bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
+        textColor: "text-emerald-600 dark:text-emerald-400",
+      },
+      {
+        title: "Total Reach",
+        value: totals.reach?.toLocaleString() || "0",
+        icon: UsersIcon,
+        color: "from-purple-500 to-purple-600",
+        bgColor: "bg-purple-50 dark:bg-purple-900/20",
+        textColor: "text-purple-600 dark:text-purple-400",
+      },
+      {
+        title: "Total Spend",
+        value: formatCurrency(totals.spend || 0),
+        icon: CurrencyRupeeIcon,
+        color: "from-orange-500 to-orange-600",
+        bgColor: "bg-orange-50 dark:bg-orange-900/20",
+        textColor: "text-orange-600 dark:text-orange-400",
+      },
+      {
+        title: "Average CTR",
+        value: `${(totals.ctr || 0).toFixed(2)}%`,
+        icon: ArrowTrendingUpIcon,
+        color: "from-indigo-500 to-indigo-600",
+        bgColor: "bg-indigo-50 dark:bg-indigo-900/20",
+        textColor: "text-indigo-600 dark:text-indigo-400",
+      },
+      {
+        title: "Average CPC",
+        value: formatCurrency(totals.cpc || 0),
+        icon: CurrencyRupeeIcon,
+        color: "from-pink-500 to-pink-600",
+        bgColor: "bg-pink-50 dark:bg-pink-900/20",
+        textColor: "text-pink-600 dark:text-pink-400",
+      },
+    ];
+  }, [processedData.totals]);
+
+  // Action stats cards
+  const actionStats = useMemo(() => {
+    const totals = processedData.totals as any;
+    if (!totals?.actions) return [];
+
+    return [
+      {
+        title: "Add to Cart",
+        value: totals.actions.add_to_cart || 0,
+        icon: ShoppingCartIcon,
+        color: "bg-emerald-500",
+      },
+      {
+        title: "Purchases",
+        value: totals.actions.purchase || 0,
+        icon: BanknotesIcon,
+        color: "bg-green-500",
+      },
+      {
+        title: "Initiate Checkout",
+        value: totals.actions.initiate_checkout || 0,
+        icon: ClockIcon,
+        color: "bg-blue-500",
+      },
+      {
+        title: "Add Payment Info",
+        value: totals.actions.add_payment_info || 0,
+        icon: CreditCardIcon,
+        color: "bg-purple-500",
+      },
+    ];
+  }, [processedData.totals]);
+
+  if (!showModal) return null;
 
   return (
     <Portal>
       <AnimatePresence>
-        {showModal && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleClose();
+          }}>
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center p-2 sm:p-4"
-            style={{
-              pointerEvents: "auto",
-              zIndex: 10000,
-            }}
-            onClick={closeModal}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-7xl h-[95vh] overflow-hidden border border-gray-200 dark:border-gray-700 flex flex-col"
-              onClick={(e) => e.stopPropagation()}>
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-shrink-0">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                    <Target className="h-6 w-6 text-blue-600" />
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ duration: 0.3 }}
+            className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}>
+            {/* Header - FIXED */}
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                    <ChartBarIcon className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white line-clamp-1">
-                      {selectedCampaignForModal.name}
+                    <h2 className="text-xl font-bold text-white">
+                      {selectedCampaignForModal?.name || "Campaign Details"}
                     </h2>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
-                      Detailed insights and performance metrics
+                    <div className="flex items-center space-x-4 text-blue-100 text-sm">
+                      <span>ID: {selectedCampaignForModal?.id}</span>
+                      <div className="flex items-center space-x-1">
+                        {getStatusIcon(selectedCampaignForModal?.status || "")}
+                        <span>{selectedCampaignForModal?.status}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleClose();
+                  }}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors">
+                  <XMarkIcon className="h-6 w-6 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content - FIXED SCROLL */}
+            <div className="flex-1 overflow-y-auto overscroll-contain">
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Loading campaign insights...
                     </p>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={closeModal}
-                  className="hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full w-10 h-10 flex-shrink-0">
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-
-              <div className="overflow-y-auto flex-1 p-4 sm:p-6">
-                <div className="space-y-6">
-                  {/* Campaign Info Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Target className="h-5 w-5 text-blue-600" />
-                        <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                          Objective
-                        </p>
-                      </div>
-                      <p className="font-semibold text-gray-900 dark:text-gray-100">
-                        {selectedCampaignForModal.objective?.replace(
+              ) : (
+                <div className="p-6 space-y-8">
+                  {/* Campaign Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                        Objective
+                      </h4>
+                      <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {selectedCampaignForModal?.objective?.replace(
                           "OUTCOME_",
                           ""
                         ) || "N/A"}
                       </p>
                     </div>
-                    <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 rounded-xl p-4 border border-emerald-200 dark:border-emerald-800">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Play className="h-5 w-5 text-emerald-600" />
-                        <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                          Status
-                        </p>
-                      </div>
-                      <div>
-                        {getStatusBadge(selectedCampaignForModal.status)}
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                        Status
+                      </h4>
+                      <div className="flex items-center space-x-2">
+                        <span
+                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                            selectedCampaignForModal?.status || ""
+                          )}`}>
+                          {selectedCampaignForModal?.status}
+                        </span>
                       </div>
                     </div>
-                    <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800">
-                      <div className="flex items-center gap-3 mb-2">
-                        <DollarSign className="h-5 w-5 text-amber-600" />
-                        <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                          Daily Budget
-                        </p>
-                      </div>
-                      <p className="font-semibold text-gray-900 dark:text-gray-100">
-                        {selectedCampaignForModal.daily_budget
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                        Daily Budget
+                      </h4>
+                      <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {selectedCampaignForModal?.daily_budget
                           ? formatCurrency(
                               Number.parseInt(
                                 selectedCampaignForModal.daily_budget
@@ -266,312 +398,381 @@ const CampaignModal: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Ad Sets Performance */}
-                  {campaignInsights.length > 0 ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
-                          Ad Sets Performance
-                        </h3>
-                        <Badge variant="secondary">
-                          {campaignInsights.length} ad sets
-                        </Badge>
-                      </div>
-
-                      <div className="overflow-x-auto bg-gray-50 dark:bg-gray-900/50 rounded-xl">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="border-gray-200 dark:border-gray-700">
-                              <TableHead className="font-semibold">
-                                Ad Set
-                              </TableHead>
-                              <TableHead className="font-semibold">
-                                Ad Name
-                              </TableHead>
-                              <TableHead className="font-semibold text-right">
-                                Impressions
-                              </TableHead>
-                              <TableHead className="font-semibold text-right">
-                                Clicks
-                              </TableHead>
-                              <TableHead className="font-semibold text-right">
-                                Spend
-                              </TableHead>
-                              <TableHead className="font-semibold text-right">
-                                CTR
-                              </TableHead>
-                              <TableHead className="font-semibold text-right">
-                                CPC
-                              </TableHead>
-                              <TableHead className="font-semibold text-right">
-                                CPP
-                              </TableHead>
-                              <TableHead className="font-semibold text-right">
-                                Actions
-                              </TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {campaignInsights.map((insight, index) => (
-                              <TableRow
-                                key={index}
-                                className="border-gray-200 dark:border-gray-700">
-                                <TableCell className="font-medium">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                                      <Users className="h-3 w-3 text-purple-600" />
-                                    </div>
-                                    <span className="truncate max-w-[150px]">
-                                      {insight.adset_name}
-                                    </span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="truncate max-w-[150px]">
-                                  {insight.ad_name}
-                                </TableCell>
-                                <TableCell className="text-right font-medium">
-                                  {formatNumber(
-                                    Number.parseInt(insight.impressions || "0")
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right font-medium">
-                                  {formatNumber(
-                                    Number.parseInt(insight.clicks || "0")
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right font-bold text-blue-600 dark:text-blue-400">
-                                  {formatCurrency(
-                                    Number.parseFloat(insight.spend || "0")
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div
-                                    className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                                      Number.parseFloat(insight.ctr || "0") > 1
-                                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                        : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                                    }`}>
-                                    {Number.parseFloat(insight.ctr).toFixed(2)}%
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right font-medium">
-                                  {formatCurrency(
-                                    Number.parseFloat(insight.cpc || "0")
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right font-medium">
-                                  {(() => {
-                                    const purchases =
-                                      insight.actions?.find(
-                                        (action) =>
-                                          action.action_type === "purchase"
-                                      )?.value || "0";
-                                    const spend = Number.parseFloat(
-                                      insight.spend || "0"
-                                    );
-                                    const purchaseCount =
-                                      Number.parseInt(purchases);
-                                    const cpp =
-                                      purchaseCount > 0
-                                        ? spend / purchaseCount
-                                        : 0;
-                                    return formatCurrency(cpp);
-                                  })()}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div className="space-y-1 text-xs">
-                                    {insight.actions?.map(
-                                      (action, actionIndex) => {
-                                        if (
-                                          [
-                                            "add_to_cart",
-                                            "purchase",
-                                            "initiate_checkout",
-                                            "add_payment_info",
-                                          ].includes(action.action_type)
-                                        ) {
-                                          return (
-                                            <div
-                                              key={actionIndex}
-                                              className="flex justify-between items-center">
-                                              <span className="text-gray-500 dark:text-gray-400 capitalize">
-                                                {action.action_type.replace(
-                                                  /_/g,
-                                                  " "
-                                                )}
-                                                :
-                                              </span>
-                                              <span className="font-medium ml-2">
-                                                {Number.parseInt(
-                                                  action.value || "0"
-                                                ).toLocaleString()}
-                                              </span>
-                                            </div>
-                                          );
-                                        }
-                                        return null;
-                                      }
-                                    )}
-                                    {(!insight.actions ||
-                                      !insight.actions.some((action) =>
-                                        [
-                                          "add_to_cart",
-                                          "purchase",
-                                          "initiate_checkout",
-                                          "add_payment_info",
-                                        ].includes(action.action_type)
-                                      )) && (
-                                      <span className="text-gray-400 italic">
-                                        No actions
-                                      </span>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-
-                      {/* Performance Chart for Campaign */}
-                      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
-                        <h4 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-                          Performance Breakdown
-                        </h4>
-                        <div className="h-64 sm:h-80">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                              data={campaignInsights.map((insight) => ({
-                                name:
-                                  insight.adset_name.length > 12
-                                    ? insight.adset_name.substring(0, 12) +
-                                      "..."
-                                    : insight.adset_name,
-                                fullName: insight.adset_name,
-                                spend: Number.parseFloat(insight.spend || "0"),
-                                clicks: Number.parseInt(insight.clicks || "0"),
-                                impressions:
-                                  Number.parseInt(insight.impressions || "0") /
-                                  1000,
-                                ctr:
-                                  Number.parseFloat(insight.ctr || "0") * 100,
-                              }))}
-                              margin={{
-                                top: 20,
-                                right: 30,
-                                left: 20,
-                                bottom: 40,
-                              }}>
-                              <CartesianGrid
-                                strokeDasharray="3 3"
-                                className="opacity-30"
-                              />
-                              <XAxis
-                                dataKey="name"
-                                className="text-xs"
-                                angle={-45}
-                                textAnchor="end"
-                                height={80}
-                              />
-                              <YAxis className="text-xs" />
-                              <Tooltip
-                                contentStyle={{
-                                  backgroundColor: isDarkMode
-                                    ? "#374151"
-                                    : "#ffffff",
-                                  border: isDarkMode
-                                    ? "1px solid #4B5563"
-                                    : "1px solid #E5E7EB",
-                                  borderRadius: "12px",
-                                  boxShadow:
-                                    "0 10px 15px -3px rgb(0 0 0 / 0.1)",
-                                }}
-                                formatter={(value, name) => {
-                                  if (name === "Spend (₹)")
-                                    return [
-                                      formatCurrency(Number(value)),
-                                      name,
-                                    ];
-                                  if (name === "Impressions (K)")
-                                    return [
-                                      formatNumber(Number(value) * 1000),
-                                      "Impressions",
-                                    ];
-                                  if (name === "CTR (%)")
-                                    return [
-                                      `${Number(value).toFixed(2)}%`,
-                                      "CTR",
-                                    ];
-                                  return [formatNumber(Number(value)), name];
-                                }}
-                                labelFormatter={(label) => {
-                                  const adSet = campaignInsights.find(
-                                    (insight) =>
-                                      insight.adset_name.startsWith(
-                                        label.replace("...", "")
-                                      )
-                                  );
-                                  return adSet ? adSet.adset_name : label;
-                                }}
-                              />
-                              <Legend />
-                              <Bar
-                                dataKey="spend"
-                                fill={CHART_COLORS.tertiary}
-                                name="Spend (₹)"
-                                radius={[4, 4, 0, 0]}
-                              />
-                              <Bar
-                                dataKey="clicks"
-                                fill={CHART_COLORS.secondary}
-                                name="Clicks"
-                                radius={[4, 4, 0, 0]}
-                              />
-                              <Bar
-                                dataKey="ctr"
-                                fill={CHART_COLORS.purple}
-                                name="CTR (%)"
-                                radius={[4, 4, 0, 0]}
-                              />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="py-12 text-center">
-                      <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4 mx-auto">
-                        <BarChart3 className="h-8 w-8 text-gray-400" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                        No Performance Data
+                  {/* Performance Stats */}
+                  {statsCards.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                        <ChartBarIcon className="mr-2 text-blue-600 h-5 w-5" />
+                        Campaign Performance
                       </h3>
-                      <p className="text-gray-500 dark:text-gray-400 text-center max-w-sm mb-4 mx-auto">
-                        No insights available for this campaign in the selected
-                        time period.
-                      </p>
-                      <Button
-                        onClick={() =>
-                          dispatch(
-                            fetchCampaignInsights(selectedCampaignForModal.id)
-                          )
-                        }
-                        disabled={loading}
-                        variant="outline">
-                        {loading ? (
-                          <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                        )}
-                        Retry
-                      </Button>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {statsCards.map((card, index) => (
+                          <motion.div
+                            key={card.title}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                            className={`${card.bgColor} flex items-center justify-between backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl p-6`}>
+                            <div className="flex items-center justify-between gap-3">
+                              <div
+                                className={`w-7 h-7 bg-gradient-to-r ${card.color} flex items-center justify-center rounded-lg`}>
+                                <card.icon className="h-4 w-4 text-white" />
+                              </div>
+                              <p className="text-lg text-gray-600 dark:text-gray-400">
+                                {card.title}
+                              </p>
+                            </div>
+
+                            <p className="text-lg font-bold text-gray-900 dark:text-white">
+                              {card.value}
+                            </p>
+                          </motion.div>
+                        ))}
+                      </div>
                     </div>
                   )}
+
+                  {/* Action Stats */}
+                  {actionStats.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                        <BanknotesIcon className="mr-2 text-green-600 h-5 w-5" />
+                        Conversion Actions
+                      </h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {actionStats.map((stat, index) => (
+                          <motion.div
+                            key={stat.title}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: index * 0.05 }}
+                            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-center flex items-center justify-between">
+                            <div className="flex items-center justify-between gap-3">
+                              <div
+                                className={`w-7 h-7 ${stat.color} flex items-center justify-center rounded-lg`}>
+                                <stat.icon className="h-4 w-4 text-white" />
+                              </div>
+                              <p className="text-lg text-gray-600 dark:text-gray-400">
+                                {stat.title}
+                              </p>
+                            </div>
+
+                            <p className="text-lg font-bold text-gray-900 dark:text-white">
+                              {stat.value}
+                            </p>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ad Insights Table */}
+                  <div>
+                    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                          <TableCellsIcon className="mr-2 text-purple-600 h-5 w-5" />
+                          Ad Set Performance
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                          Detailed breakdown by ad set and individual ads
+                        </p>
+                      </div>
+
+                      {/* Filters */}
+                      <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+                        {/* Search */}
+                        <div className="relative">
+                          <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <input
+                            type="text"
+                            placeholder="Search ad sets..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[200px]"
+                          />
+                        </div>
+
+                        {/* Sort */}
+                        <select
+                          value={`${sortBy}-${sortOrder}`}
+                          onChange={(e) => {
+                            const [field, order] = e.target.value.split("-");
+                            setSortBy(field);
+                            setSortOrder(order);
+                          }}
+                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                          <option value="spend-desc">
+                            Spend (High to Low)
+                          </option>
+                          <option value="spend-asc">Spend (Low to High)</option>
+                          <option value="impressions-desc">
+                            Impressions (High to Low)
+                          </option>
+                          <option value="clicks-desc">
+                            Clicks (High to Low)
+                          </option>
+                          <option value="ctr-desc">CTR (High to Low)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {filteredInsights.length > 0 ? (
+                      <div className="overflow-x-scroll bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                          <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                            <tr>
+                              <th className="min-w-[30px] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                S.No
+                              </th>
+                              <th className="min-w-[100px] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Ad Set
+                              </th>
+                              <th className="min-w-[120px] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Ad Name
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Impressions
+                              </th>
+                              <th className="min-w-[90px] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Clicks
+                              </th>
+                              <th className="min-w-[90px] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Reach
+                              </th>
+                              <th className="min-w-[90px] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                CTR
+                              </th>
+                              <th className="min-w-[90px] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Spend
+                              </th>
+                              <th className="min-w-[90px] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                CPC
+                              </th>
+                              <th className="min-w-[90px] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                CPP
+                              </th>
+                              <th className="min-w-[100px] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Objective
+                              </th>
+                              <th className="min-w-[100px] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Buying Type
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Action Values
+                              </th>
+                              <th className="min-w-[150px] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Start Date
+                              </th>
+                              <th className="min-w-[150px] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                End Date
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            {filteredInsights.map(
+                              (insight: any, index: number) => (
+                                <motion.tr
+                                  key={`${insight.adset_id}-${insight.ad_id}-${index}`}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: index * 0.03 }}
+                                  className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
+                                  {/* Sno */}
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {index + 1}
+                                    </div>
+                                  </td>
+                                  {/* Ad Set */}
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {insight.adset_name}
+                                    </div>
+                                  </td>
+
+                                  {/* Ad Name */}
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-900 dark:text-white">
+                                      {insight.ad_name}
+                                    </div>
+                                  </td>
+
+                                  {/* Impressions */}
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {parseInt(
+                                        insight.impressions
+                                      ).toLocaleString()}
+                                    </div>
+                                  </td>
+
+                                  {/* Clicks */}
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {parseInt(
+                                        insight.clicks
+                                      ).toLocaleString()}
+                                    </div>
+                                  </td>
+
+                                  {/* Reach */}
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {parseInt(insight.reach).toLocaleString()}
+                                    </div>
+                                  </td>
+
+                                  {/* CTR */}
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                                      {parseFloat(insight.ctr).toFixed(2)}%
+                                    </div>
+                                  </td>
+
+                                  {/* Spend */}
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {formatCurrency(
+                                        parseFloat(insight.spend)
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* CPC */}
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-900 dark:text-white">
+                                      {formatCurrency(parseFloat(insight.cpc))}
+                                    </div>
+                                  </td>
+
+                                  {/* CPP */}
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-900 dark:text-white">
+                                      {insight.cpp
+                                        ? formatCurrency(
+                                            parseFloat(insight.cpp)
+                                          )
+                                        : "N/A"}
+                                    </div>
+                                  </td>
+
+                                  {/* Objective */}
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-900 dark:text-white">
+                                      {insight.objective?.replace(
+                                        "OUTCOME_",
+                                        ""
+                                      ) || "N/A"}
+                                    </div>
+                                  </td>
+
+                                  {/* Buying Type */}
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-900 dark:text-white">
+                                      {insight.buying_type || "N/A"}
+                                    </div>
+                                  </td>
+
+                                  {/* Action Values */}
+                                  <td className="px-4 py-4">
+                                    <div className="grid grid-cols-2 gap-2 text-xs min-w-[200px]">
+                                      <div className="flex gap-2">
+                                        <span className="text-gray-500 block">
+                                          Add to Cart:
+                                        </span>
+                                        <span className="font-medium text-emerald-600">
+                                          {getActionValue(
+                                            insight,
+                                            "add_to_cart"
+                                          )}
+                                        </span>
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <span className="text-gray-500 block">
+                                          Purchase:
+                                        </span>
+                                        <span className="font-medium text-green-600">
+                                          {getActionValue(insight, "purchase")}
+                                        </span>
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <span className="text-gray-500 block">
+                                          Checkout:
+                                        </span>
+                                        <span className="font-medium text-blue-600">
+                                          {getActionValue(
+                                            insight,
+                                            "initiate_checkout"
+                                          )}
+                                        </span>
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <span className="text-gray-500 block">
+                                          Payment:
+                                        </span>
+                                        <span className="font-medium text-purple-600">
+                                          {getActionValue(
+                                            insight,
+                                            "add_payment_info"
+                                          )}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  {/* Start Date */}
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-900 dark:text-white">
+                                      {insight.date_start
+                                        ? new Date(
+                                            insight.date_start
+                                          ).toLocaleDateString("en-IN")
+                                        : "N/A"}
+                                    </div>
+                                  </td>
+
+                                  {/* End Date */}
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-900 dark:text-white">
+                                      {insight.date_stop
+                                        ? new Date(
+                                            insight.date_stop
+                                          ).toLocaleDateString("en-IN")
+                                        : "Ongoing"}
+                                    </div>
+                                  </td>
+                                </motion.tr>
+                              )
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <TableCellsIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                          No Ad Insights Found
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {searchTerm
+                            ? "No ad sets match your search criteria."
+                            : "No detailed insights available for this campaign."}
+                        </p>
+                        {searchTerm && (
+                          <button
+                            onClick={() => setSearchTerm("")}
+                            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                            Clear Search
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </motion.div>
+              )}
+            </div>
           </motion.div>
-        )}
+        </motion.div>
       </AnimatePresence>
     </Portal>
   );

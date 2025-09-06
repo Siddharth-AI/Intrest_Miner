@@ -25,7 +25,7 @@ const Portal: React.FC<PortalProps> = ({
       modalContainer.style.left = "0";
       modalContainer.style.width = "100%";
       modalContainer.style.height = "100%";
-      modalContainer.style.pointerEvents = "none";
+      // modalContainer.style.pointerEvents = "none";
       modalContainer.style.zIndex = "10000";
       document.body.appendChild(modalContainer);
     }

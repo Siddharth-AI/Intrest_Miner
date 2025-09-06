@@ -2,7 +2,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 
 // ===== Types =====
-
 export interface AdAccount {
   id: string;
   name: string;
@@ -21,6 +20,8 @@ export interface Campaign {
   daily_budget?: string;
   lifetime_budget?: string;
   source_campaign_id: string;
+  totals?: any;
+  verdict?: any;
 }
 
 export interface InsightData {
@@ -42,8 +43,8 @@ export interface InsightData {
   cpc: string;
   cpp: string;
   reach: string;
-  actions?: Array<{ action_type: string; value: string; }>;
-  action_values?: Array<{ action_type: string; value: string; }>;
+  actions?: Array<{ action_type: string; value: string }>;
+  action_values?: Array<{ action_type: string; value: string }>;
   objective: string;
   buying_type: string;
   full_view_impressions: string;
@@ -68,12 +69,105 @@ interface CustomDateRange {
   since: string;
   until: string;
 }
+interface TopCampaign {
+  id: string;
+  name: string;
+  objective: string;
+  status: string;
+  start_time: string;
+  stop_time?: string;
+  daily_budget?: string;
+  source_campaign_id: string;
+  totals: {
+    impressions: number;
+    clicks: number;
+    reach: number;
+    spend: number;
+    ctr: number;
+    cpc: number;
+    cpp: number;
+    actions: {
+      add_to_cart: number;
+      purchase: number;
+      initiate_checkout: number;
+      add_payment_info: number;
+    };
+  };
+  verdict: {
+    category: string;
+    reason: string;
+    recommendation: string;
+  };
+  score: number;
+};
 
+interface StableCampaigns {
+  id: string;
+  name: string;
+  objective: string;
+  status: string;
+  start_time: string;
+  stop_time?: string;
+  daily_budget?: string;
+  source_campaign_id: string;
+  totals: {
+    impressions: number;
+    clicks: number;
+    reach: number;
+    spend: number;
+    ctr: number;
+    cpc: number;
+    cpp: number;
+    actions: {
+      add_to_cart: number;
+      purchase: number;
+      initiate_checkout: number;
+      add_payment_info: number;
+    };
+  };
+  verdict: {
+    category: string;
+    reason: string;
+    recommendation: string;
+  };
+}
+
+interface underperforming {
+  id: string;
+  name: string;
+  objective: string;
+  status: string;
+  start_time: string;
+  stop_time?: string;
+  daily_budget?: string;
+  source_campaign_id: string;
+  totals: {
+    impressions: number;
+    clicks: number;
+    reach: number;
+    spend: number;
+    ctr: number;
+    cpc: number;
+    cpp: number;
+    actions: {
+      add_to_cart: number;
+      purchase: number;
+      initiate_checkout: number;
+      add_payment_info: number;
+    };
+  };
+  verdict: {
+    category: string;
+    reason: string;
+    recommendation: string;
+  };
+}
 interface FacebookAdsState {
   adAccounts: AdAccount[];
   campaigns: Campaign[];
-  insights: InsightData[]; // For "analyze" (all campaigns)
-  campaignInsights: InsightData[]; // For current selected campaign (mode: "single")
+  insights: InsightData[];
+  campaignInsights: InsightData[];
+  campaignInsightstotal: InsightData[];
   aggregatedStats: AggregatedStats | null;
   selectedAccount: string;
   selectedCampaign: string;
@@ -89,24 +183,20 @@ interface FacebookAdsState {
   selectedCampaignForModal: Campaign | null;
   error: string | null;
   lastUpdated: string | null;
+
+  // 🔹 New for AnalyticsPage
+  campaignAnalysis: Campaign[];
+  overallTotals: any | null;
+  loadingCampaigns: boolean;
+  loadingTotals: boolean;
+  topCampaign: TopCampaign[];
+  stableCampaigns: StableCampaigns[];
+  underperforming: underperforming[];
 }
 
 // ===== Helpers =====
-
 const getAccessToken = () => localStorage.getItem("FB_ACCESS_TOKEN");
 
-// Helper: build date parameter for queries
-const buildDateParameter = (dateFilter: string, customDateRange: CustomDateRange) => {
-  if (dateFilter === "custom" && customDateRange.since && customDateRange.until) {
-    return `time_range={"since":"${customDateRange.since}","until":"${customDateRange.until}"}`;
-  } else if (dateFilter === "maximum") {
-    return "date_preset=maximum";
-  } else {
-    return `date_preset=${dateFilter}`;
-  }
-};
-
-// Aggregate insight stats helper
 const calculateAggregatedStats = (insights: InsightData[]): AggregatedStats | null => {
   if (!insights.length) return null;
   const totals = {
@@ -158,12 +248,13 @@ const calculateAggregatedStats = (insights: InsightData[]): AggregatedStats | nu
 };
 
 // ===== Initial State =====
-
 const initialState: FacebookAdsState = {
   adAccounts: [],
   campaigns: [],
   insights: [],
   campaignInsights: [],
+
+  campaignInsightstotal: [],
   aggregatedStats: null,
   selectedAccount: "",
   selectedCampaign: "",
@@ -179,11 +270,16 @@ const initialState: FacebookAdsState = {
   selectedCampaignForModal: null,
   error: null,
   lastUpdated: null,
+  topCampaign: [],
+  stableCampaigns: [],
+  underperforming: [],
+  campaignAnalysis: [], // 🔹 new
+  overallTotals: null,  // 🔹 new
+  loadingCampaigns: false, // 🔹 new
+  loadingTotals: false,    // 🔹 new
 };
 
 // ===== Thunks =====
-
-// Fetch Ad Accounts
 export const fetchAdAccounts = createAsyncThunk("facebookAds/fetchAdAccounts", async (_, { rejectWithValue }) => {
   const token = getAccessToken();
   if (!token) return rejectWithValue("No access token found");
@@ -198,7 +294,6 @@ export const fetchAdAccounts = createAsyncThunk("facebookAds/fetchAdAccounts", a
   }
 });
 
-// Fetch Campaigns
 export const fetchCampaigns = createAsyncThunk("facebookAds/fetchCampaigns", async (accountId: string, { rejectWithValue }) => {
   const token = getAccessToken();
   if (!token) return rejectWithValue("No access token found");
@@ -213,7 +308,6 @@ export const fetchCampaigns = createAsyncThunk("facebookAds/fetchCampaigns", asy
   }
 });
 
-// Fetch Insights (multi-campaign, "analyze" mode)
 export const fetchInsights = createAsyncThunk("facebookAds/fetchInsights", async (_, { getState, rejectWithValue }) => {
   const state = getState() as { facebookAds: FacebookAdsState };
   const { selectedAccount, dateFilter, customDateRange } = state.facebookAds;
@@ -236,15 +330,12 @@ export const fetchInsights = createAsyncThunk("facebookAds/fetchInsights", async
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    const data = await res.json();
-    // Defensive: backend may wrap campaigns in {insights:[]} or return array directly.
-    return Array.isArray(data) ? data : data.insights || [];
+    return await res.json();
   } catch (err: any) {
     return rejectWithValue(err.message || "Failed to fetch insights");
   }
 });
 
-// Fetch Single Campaign Insights (for currently selected campaign)
 export const fetchCampaignInsights = createAsyncThunk(
   "facebookAds/fetchCampaignInsights",
   async (campaignId: string, { getState, rejectWithValue }) => {
@@ -270,8 +361,7 @@ export const fetchCampaignInsights = createAsyncThunk(
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-      const data = await res.json();
-      return data.insights || [];
+      return await res.json();
     } catch (err: any) {
       return rejectWithValue(err.message || "Failed to fetch campaign insights");
     }
@@ -279,31 +369,13 @@ export const fetchCampaignInsights = createAsyncThunk(
 );
 
 // ===== Slice =====
-
 const facebookAdsSlice = createSlice({
   name: "facebookAds",
   initialState,
   reducers: {
+    // (your apprentice’s reducers unchanged)
     clearAllData: state => {
-      state.adAccounts = [];
-      state.campaigns = [];
-      state.insights = [];
-      state.campaignInsights = [];
-      state.aggregatedStats = null;
-      state.selectedAccount = "";
-      state.selectedCampaign = "";
-      state.dateFilter = "maximum";
-      state.customDateRange = { since: "", until: "" };
-      state.searchTerm = "";
-      state.statusFilter = "all";
-      state.loading = false;
-      state.initialLoading = true;
-      state.showModal = false;
-      state.showCustomDatePicker = false;
-      state.showAnalyticsModal = false;
-      state.selectedCampaignForModal = null;
-      state.error = null;
-      state.lastUpdated = null;
+      Object.assign(state, initialState);
       if (typeof window !== "undefined") localStorage.removeItem("FB_ACCESS_TOKEN");
     },
     setSelectedAccount: (state, action: PayloadAction<string>) => {
@@ -311,6 +383,7 @@ const facebookAdsSlice = createSlice({
       state.campaigns = [];
       state.insights = [];
       state.campaignInsights = [];
+      state.campaignInsightstotal = [];
       state.aggregatedStats = null;
       state.searchTerm = "";
       state.statusFilter = "all";
@@ -318,6 +391,8 @@ const facebookAdsSlice = createSlice({
     setSelectedCampaign: (state, action: PayloadAction<string>) => {
       state.selectedCampaign = action.payload;
       state.campaignInsights = [];
+
+      state.campaignInsightstotal = [];
     },
     setDateFilter: (state, action: PayloadAction<string>) => {
       state.dateFilter = action.payload;
@@ -359,9 +434,7 @@ const facebookAdsSlice = createSlice({
     setShowAnalyticsModal: (state, action: PayloadAction<boolean>) => {
       state.showAnalyticsModal = action.payload;
     },
-    setAnalysisResults: (state, action: PayloadAction<any>) => {
-      // placeholder for analytics data
-    },
+    setAnalysisResults: (state, action: PayloadAction<any>) => { },
     resetFilters: (state) => {
       state.searchTerm = "";
       state.statusFilter = "all";
@@ -371,67 +444,71 @@ const facebookAdsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // ===== Ad Accounts =====
       .addCase(fetchAdAccounts.pending, (state) => {
         state.loading = true;
-        state.error = null;
+        state.initialLoading = true;
       })
       .addCase(fetchAdAccounts.fulfilled, (state, action) => {
+        state.adAccounts = action.payload;
         state.loading = false;
         state.initialLoading = false;
-        state.adAccounts = action.payload;
-        state.lastUpdated = new Date().toISOString();
-        if (action.payload.length > 0 && !state.selectedAccount) {
-          state.selectedAccount = action.payload[0].id;
-        }
       })
       .addCase(fetchAdAccounts.rejected, (state, action) => {
         state.loading = false;
         state.initialLoading = false;
         state.error = action.payload as string;
       })
+
+      // ===== Campaigns =====
       .addCase(fetchCampaigns.pending, (state) => {
-        state.loading = true;
-        state.error = null;
+        state.loadingCampaigns = true;
       })
       .addCase(fetchCampaigns.fulfilled, (state, action) => {
-        state.loading = false;
+        state.loadingCampaigns = false;
         state.campaigns = action.payload;
-        state.lastUpdated = new Date().toISOString();
       })
       .addCase(fetchCampaigns.rejected, (state, action) => {
-        state.loading = false;
+        state.loadingCampaigns = false;
         state.error = action.payload as string;
       })
+
+      // ===== Insights (Totals) =====
       .addCase(fetchInsights.pending, (state) => {
-        state.loading = true;
-        state.error = null;
+        state.loadingTotals = true;
       })
       .addCase(fetchInsights.fulfilled, (state, action) => {
-        state.loading = false;
-        state.insights = action.payload;
-        state.aggregatedStats = calculateAggregatedStats(action.payload);
-        state.lastUpdated = new Date().toISOString();
+        state.loadingTotals = false;
+        const data = action.payload;
+        state.overallTotals = data.overallTotals || null;
+        state.campaignAnalysis = data.campaignAnalysis || [];
+        state.topCampaign = data.topCampaign || [];
+        state.stableCampaigns = data.stableCampaigns || [];
+        state.underperforming = data.underperforming || [];
+        state.insights = data.insights || [];
+        state.aggregatedStats = calculateAggregatedStats(state.insights);
       })
       .addCase(fetchInsights.rejected, (state, action) => {
-        state.loading = false;
+        state.loadingTotals = false;
         state.error = action.payload as string;
       })
+
+      // ===== Single Campaign Insights =====
       .addCase(fetchCampaignInsights.pending, (state) => {
         state.loading = true;
-        state.error = null;
       })
       .addCase(fetchCampaignInsights.fulfilled, (state, action) => {
         state.loading = false;
-        state.campaignInsights = action.payload;
+        state.campaignInsights = action.payload || [];
+        state.campaignInsightstotal = action.payload.insights || [];
       })
       .addCase(fetchCampaignInsights.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });
-  },
-});
+  }
 
-// ===== Exports =====
+});
 
 export const {
   setSelectedAccount,

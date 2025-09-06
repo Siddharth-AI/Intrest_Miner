@@ -19,6 +19,10 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ClockIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronDoubleLeftIcon,
+  ChevronDoubleRightIcon,
 } from "@heroicons/react/24/outline";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import {
@@ -41,6 +45,10 @@ const AnalyticsPage: React.FC = () => {
   const [dateRangeStart, setDateRangeStart] = useState("");
   const [dateRangeEnd, setDateRangeEnd] = useState("");
 
+  // 🔥 NEW: Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage] = useState(8); // Fixed at 8 rows per page
+
   const {
     adAccounts,
     campaigns, // This will be from fetchCampaigns API
@@ -50,9 +58,11 @@ const AnalyticsPage: React.FC = () => {
     loadingCampaigns, // Loading for campaigns table (fetchCampaigns)
     initialLoading,
   } = useAppSelector((state) => state.facebookAds);
+
   const token = localStorage.getItem("FB_ACCESS_TOKEN");
   const hasToken = Boolean(token);
   const router = useNavigate();
+
   useEffect(() => {
     const checkTheme = () => {
       setIsDarkMode(document.documentElement.classList.contains("dark"));
@@ -73,7 +83,7 @@ const AnalyticsPage: React.FC = () => {
     if (adAccounts.length === 0) {
       dispatch(fetchAdAccounts());
     }
-  }, [dispatch, adAccounts.length]);
+  }, [adAccounts.length, dispatch]);
 
   // Auto-select first account when accounts are loaded
   useEffect(() => {
@@ -120,6 +130,7 @@ const AnalyticsPage: React.FC = () => {
 
   const handleAccountChange = (accountId: string) => {
     dispatch(setSelectedAccount(accountId));
+    setCurrentPage(1); // 🔥 Reset to first page when changing account
   };
 
   const handleRefresh = () => {
@@ -131,6 +142,7 @@ const AnalyticsPage: React.FC = () => {
 
   const handleDisconnect = () => {
     dispatch(clearAllData());
+    setCurrentPage(1); // 🔥 Reset pagination
   };
 
   // Filter campaigns locally based on search, status, and date range
@@ -160,6 +172,73 @@ const AnalyticsPage: React.FC = () => {
       return matchesSearch && matchesStatus && matchesDateRange;
     });
   }, [campaigns, searchTerm, statusFilter, dateRangeStart, dateRangeEnd]);
+
+  // 🔥 NEW: Pagination logic
+  const paginationData = useMemo(() => {
+    const totalItems = filteredCampaigns.length;
+    const totalPages = Math.ceil(totalItems / rowsPerPage);
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    const currentPageCampaigns = filteredCampaigns.slice(startIndex, endIndex);
+
+    return {
+      totalItems,
+      totalPages,
+      currentPageCampaigns,
+      startIndex,
+      endIndex: Math.min(endIndex, totalItems),
+    };
+  }, [filteredCampaigns, currentPage, rowsPerPage]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, dateRangeStart, dateRangeEnd]);
+
+  // 🔥 NEW: Pagination handlers
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= paginationData.totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const handleFirstPage = () => setCurrentPage(1);
+  const handleLastPage = () => setCurrentPage(paginationData.totalPages);
+  const handlePrevPage = () => setCurrentPage(Math.max(1, currentPage - 1));
+  const handleNextPage = () =>
+    setCurrentPage(Math.min(paginationData.totalPages, currentPage + 1));
+
+  // 🔥 NEW: Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const { totalPages } = paginationData;
+    const pages = [];
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      const start = Math.max(1, currentPage - 2);
+      const end = Math.min(totalPages, start + maxVisible - 1);
+
+      if (start > 1) {
+        pages.push(1);
+        if (start > 2) pages.push("...");
+      }
+
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+
+      if (end < totalPages) {
+        if (end < totalPages - 1) pages.push("...");
+        pages.push(totalPages);
+      }
+    }
+
+    return pages;
+  };
 
   const statsCards = [
     {
@@ -485,6 +564,20 @@ const AnalyticsPage: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* 🔥 NEW: Pagination Info */}
+                  <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                    <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                      <span>
+                        Showing {paginationData.startIndex + 1} to{" "}
+                        {paginationData.endIndex} of {paginationData.totalItems}{" "}
+                        campaigns
+                      </span>
+                      <span>
+                        Page {currentPage} of {paginationData.totalPages}
+                      </span>
+                    </div>
+                  </div>
+
                   <div className="p-6">
                     {loadingCampaigns ? (
                       <div className="text-center py-12">
@@ -493,7 +586,7 @@ const AnalyticsPage: React.FC = () => {
                           Loading campaigns...
                         </p>
                       </div>
-                    ) : filteredCampaigns?.length > 0 ? (
+                    ) : paginationData.currentPageCampaigns?.length > 0 ? (
                       <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                           <thead className="bg-gray-50 dark:bg-gray-700">
@@ -516,59 +609,61 @@ const AnalyticsPage: React.FC = () => {
                             </tr>
                           </thead>
                           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            {filteredCampaigns.map((campaign, index) => (
-                              <motion.tr
-                                key={campaign.id}
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: index * 0.05 }}
-                                onClick={() => handleCampaignClick(campaign)}
-                                className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-200">
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="flex items-center">
-                                    <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0 mr-3">
-                                      <ChartBarIcon className="h-5 w-5 text-white" />
-                                    </div>
-                                    <div>
-                                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                        {campaign.name}
+                            {paginationData.currentPageCampaigns.map(
+                              (campaign, index) => (
+                                <motion.tr
+                                  key={campaign.id}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: index * 0.05 }}
+                                  onClick={() => handleCampaignClick(campaign)}
+                                  className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-200">
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="flex items-center">
+                                      <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0 mr-3">
+                                        <ChartBarIcon className="h-5 w-5 text-white" />
                                       </div>
-                                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                                        ID: {campaign.id}
+                                      <div>
+                                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                          {campaign.name}
+                                        </div>
+                                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                                          ID: {campaign.id}
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span
-                                    className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                                      campaign.status
-                                    )}`}>
-                                    {campaign.status}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                  <div className="flex items-center">
-                                    <CalendarDaysIcon className="h-4 w-4 text-gray-400 mr-1" />
-                                    {formatDate(campaign.start_time)}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                  <div className="flex items-center">
-                                    <ClockIcon className="h-4 w-4 text-gray-400 mr-1" />
-                                    {formatDate(campaign.stop_time)}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                                    {campaign.objective?.replace(
-                                      "OUTCOME_",
-                                      ""
-                                    ) || "N/A"}
-                                  </span>
-                                </td>
-                              </motion.tr>
-                            ))}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <span
+                                      className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                                        campaign.status
+                                      )}`}>
+                                      {campaign.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                    <div className="flex items-center">
+                                      <CalendarDaysIcon className="h-4 w-4 text-gray-400 mr-1" />
+                                      {formatDate(campaign.start_time)}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                    <div className="flex items-center">
+                                      <ClockIcon className="h-4 w-4 text-gray-400 mr-1" />
+                                      {formatDate(campaign.stop_time)}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                                      {campaign.objective?.replace(
+                                        "OUTCOME_",
+                                        ""
+                                      ) || "N/A"}
+                                    </span>
+                                  </td>
+                                </motion.tr>
+                              )
+                            )}
                           </tbody>
                         </table>
                       </div>
@@ -604,6 +699,90 @@ const AnalyticsPage: React.FC = () => {
                       </div>
                     )}
                   </div>
+
+                  {/* 🔥 NEW: Pagination Controls */}
+                  {paginationData.totalPages > 1 && (
+                    <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          {/* First Page */}
+                          <button
+                            onClick={handleFirstPage}
+                            disabled={currentPage === 1}
+                            className={`p-2 rounded-lg border transition-colors ${
+                              currentPage === 1
+                                ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                            }`}>
+                            <ChevronDoubleLeftIcon className="h-4 w-4" />
+                          </button>
+
+                          {/* Previous Page */}
+                          <button
+                            onClick={handlePrevPage}
+                            disabled={currentPage === 1}
+                            className={`p-2 rounded-lg border transition-colors ${
+                              currentPage === 1
+                                ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                            }`}>
+                            <ChevronLeftIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        {/* Page Numbers */}
+                        <div className="flex items-center space-x-1">
+                          {getPageNumbers().map((page, index) => (
+                            <React.Fragment key={index}>
+                              {page === "..." ? (
+                                <span className="px-3 py-2 text-gray-500">
+                                  ...
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() =>
+                                    handlePageChange(page as number)
+                                  }
+                                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                    currentPage === page
+                                      ? "bg-blue-600 text-white"
+                                      : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                                  }`}>
+                                  {page}
+                                </button>
+                              )}
+                            </React.Fragment>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          {/* Next Page */}
+                          <button
+                            onClick={handleNextPage}
+                            disabled={currentPage === paginationData.totalPages}
+                            className={`p-2 rounded-lg border transition-colors ${
+                              currentPage === paginationData.totalPages
+                                ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                            }`}>
+                            <ChevronRightIcon className="h-4 w-4" />
+                          </button>
+
+                          {/* Last Page */}
+                          <button
+                            onClick={handleLastPage}
+                            disabled={currentPage === paginationData.totalPages}
+                            className={`p-2 rounded-lg border transition-colors ${
+                              currentPage === paginationData.totalPages
+                                ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                            }`}>
+                            <ChevronDoubleRightIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               </motion.div>
             </AnimatePresence>

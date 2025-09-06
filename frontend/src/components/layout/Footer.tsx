@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import type React from "react";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { ArrowUpIcon } from "lucide-react";
 
 // Simple icon components since lucide-react might not have all social icons
 const TwitterIcon = () => (
@@ -138,22 +137,6 @@ export const Footer: React.FC = () => {
 
   return (
     <>
-      {/* Scroll to Top Button
-      <motion.button
-        className={`fixed bottom-6 right-6 z-50 p-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 ${
-          showScrollTop ? "opacity-100 visible" : "opacity-0 invisible"
-        }`}
-        onClick={scrollToTop}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{
-          opacity: showScrollTop ? 1 : 0,
-          y: showScrollTop ? 0 : 20,
-        }}>
-        <ArrowUpIcon className="w-5 h-5" />
-      </motion.button> */}
-
       <footer className="relative bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
         {/* Background Pattern */}
         <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 via-transparent to-blue-50/30 dark:from-gray-800/30 dark:via-transparent dark:to-blue-900/10" />

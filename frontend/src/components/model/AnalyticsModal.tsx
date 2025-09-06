@@ -26,6 +26,10 @@ import {
   BanknotesIcon,
   ShoppingCartIcon,
   CreditCardIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronDoubleLeftIcon,
+  ChevronDoubleRightIcon,
 } from "@heroicons/react/24/outline";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import { setShowAnalyticsModal } from "../../../store/features/facebookAdsSlice";
@@ -43,6 +47,10 @@ const AnalyticsModal: React.FC = () => {
   const [dateRangeEnd, setDateRangeEnd] = useState("");
   const [showCampaignDetails, setShowCampaignDetails] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
+
+  // 🔥 NEW: Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage] = useState(8); // Fixed at 8 rows per page
 
   const {
     showAnalyticsModal,
@@ -78,6 +86,7 @@ const AnalyticsModal: React.FC = () => {
     setObjectiveFilter("all");
     setDateRangeStart("");
     setDateRangeEnd("");
+    setCurrentPage(1); // 🔥 Reset pagination on close
   };
 
   const handleCampaignClick = (campaign: any) => {
@@ -225,6 +234,80 @@ const AnalyticsModal: React.FC = () => {
     underperforming,
     campaignAnalysis,
   ]);
+
+  // 🔥 NEW: Pagination logic
+  const paginationData = useMemo(() => {
+    const totalItems = filteredCampaigns.length;
+    const totalPages = Math.ceil(totalItems / rowsPerPage);
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    const currentPageCampaigns = filteredCampaigns.slice(startIndex, endIndex);
+
+    return {
+      totalItems,
+      totalPages,
+      currentPageCampaigns,
+      startIndex,
+      endIndex: Math.min(endIndex, totalItems),
+    };
+  }, [filteredCampaigns, currentPage, rowsPerPage]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    selectedCategory,
+    searchTerm,
+    statusFilter,
+    objectiveFilter,
+    dateRangeStart,
+    dateRangeEnd,
+  ]);
+
+  // 🔥 NEW: Pagination handlers
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= paginationData.totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const handleFirstPage = () => setCurrentPage(1);
+  const handleLastPage = () => setCurrentPage(paginationData.totalPages);
+  const handlePrevPage = () => setCurrentPage(Math.max(1, currentPage - 1));
+  const handleNextPage = () =>
+    setCurrentPage(Math.min(paginationData.totalPages, currentPage + 1));
+
+  // 🔥 NEW: Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const { totalPages } = paginationData;
+    const pages = [];
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      const start = Math.max(1, currentPage - 2);
+      const end = Math.min(totalPages, start + maxVisible - 1);
+
+      if (start > 1) {
+        pages.push(1);
+        if (start > 2) pages.push("...");
+      }
+
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+
+      if (end < totalPages) {
+        if (end < totalPages - 1) pages.push("...");
+        pages.push(totalPages);
+      }
+    }
+
+    return pages;
+  };
 
   // Overall stats cards
   const statsCards = useMemo(() => {
@@ -583,9 +666,23 @@ const AnalyticsModal: React.FC = () => {
                         />
                       </div>
 
+                      {/* 🔥 NEW: Pagination Info */}
+                      <div className="px-6 py-3 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-t-lg">
+                        <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                          <span>
+                            Showing {paginationData.startIndex + 1} to{" "}
+                            {paginationData.endIndex} of{" "}
+                            {paginationData.totalItems} campaigns
+                          </span>
+                          <span>
+                            Page {currentPage} of {paginationData.totalPages}
+                          </span>
+                        </div>
+                      </div>
+
                       {/* Campaign Table */}
-                      {filteredCampaigns.length > 0 ? (
-                        <div className="overflow-x-scroll bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                      {paginationData.currentPageCampaigns.length > 0 ? (
+                        <div className="overflow-x-scroll bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-t-0">
                           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                             <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
                               <tr>
@@ -625,7 +722,7 @@ const AnalyticsModal: React.FC = () => {
                               </tr>
                             </thead>
                             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                              {filteredCampaigns.map(
+                              {paginationData.currentPageCampaigns.map(
                                 (campaign: any, index: number) => (
                                   <motion.tr
                                     key={campaign.id}
@@ -749,7 +846,7 @@ const AnalyticsModal: React.FC = () => {
                           </table>
                         </div>
                       ) : (
-                        <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-b-lg border border-gray-200 dark:border-gray-700 border-t-0">
                           <TableCellsIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                             No Campaigns Found
@@ -780,6 +877,94 @@ const AnalyticsModal: React.FC = () => {
                               Clear Filters
                             </button>
                           )}
+                        </div>
+                      )}
+
+                      {/* 🔥 NEW: Pagination Controls */}
+                      {paginationData.totalPages > 1 && (
+                        <div className="px-6 py-4 border border-gray-200 dark:border-gray-700 border-t-0 bg-gray-50 dark:bg-gray-900/50 rounded-b-lg">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              {/* First Page */}
+                              <button
+                                onClick={handleFirstPage}
+                                disabled={currentPage === 1}
+                                className={`p-2 rounded-lg border transition-colors ${
+                                  currentPage === 1
+                                    ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                    : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                                }`}>
+                                <ChevronDoubleLeftIcon className="h-4 w-4" />
+                              </button>
+
+                              {/* Previous Page */}
+                              <button
+                                onClick={handlePrevPage}
+                                disabled={currentPage === 1}
+                                className={`p-2 rounded-lg border transition-colors ${
+                                  currentPage === 1
+                                    ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                    : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                                }`}>
+                                <ChevronLeftIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+
+                            {/* Page Numbers */}
+                            <div className="flex items-center space-x-1">
+                              {getPageNumbers().map((page, index) => (
+                                <React.Fragment key={index}>
+                                  {page === "..." ? (
+                                    <span className="px-3 py-2 text-gray-500">
+                                      ...
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() =>
+                                        handlePageChange(page as number)
+                                      }
+                                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        currentPage === page
+                                          ? "bg-indigo-600 text-white"
+                                          : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                                      }`}>
+                                      {page}
+                                    </button>
+                                  )}
+                                </React.Fragment>
+                              ))}
+                            </div>
+
+                            <div className="flex items-center space-x-2">
+                              {/* Next Page */}
+                              <button
+                                onClick={handleNextPage}
+                                disabled={
+                                  currentPage === paginationData.totalPages
+                                }
+                                className={`p-2 rounded-lg border transition-colors ${
+                                  currentPage === paginationData.totalPages
+                                    ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                    : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                                }`}>
+                                <ChevronRightIcon className="h-4 w-4" />
+                              </button>
+
+                              {/* Last Page */}
+                              <button
+                                onClick={handleLastPage}
+                                disabled={
+                                  currentPage === paginationData.totalPages
+                                }
+                                className={`p-2 rounded-lg border transition-colors ${
+                                  currentPage === paginationData.totalPages
+                                    ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                    : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                                }`}>
+                                <ChevronDoubleRightIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>

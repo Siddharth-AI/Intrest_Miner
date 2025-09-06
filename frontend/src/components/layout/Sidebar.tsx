@@ -10,8 +10,6 @@ import {
   User,
   Brain,
   History,
-  Pickaxe,
-  ChevronUp,
   LogOut,
   X,
 } from "lucide-react";

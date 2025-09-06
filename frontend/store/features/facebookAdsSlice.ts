@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 
-// ===== Types =====
+// ===== Types ===== (unchanged)
 export interface AdAccount {
   id: string;
   name: string;
@@ -69,6 +69,7 @@ interface CustomDateRange {
   since: string;
   until: string;
 }
+
 interface TopCampaign {
   id: string;
   name: string;
@@ -99,7 +100,7 @@ interface TopCampaign {
     recommendation: string;
   };
   score: number;
-};
+}
 
 interface StableCampaigns {
   id: string;
@@ -162,6 +163,7 @@ interface underperforming {
     recommendation: string;
   };
 }
+
 interface FacebookAdsState {
   adAccounts: AdAccount[];
   campaigns: Campaign[];
@@ -247,13 +249,35 @@ const calculateAggregatedStats = (insights: InsightData[]): AggregatedStats | nu
   };
 };
 
+// 🔥 NEW: Helper function to safely separate campaigns
+const separateCampaignsByCategory = (campaigns: Campaign[]) => {
+  const underperformingCampaigns: any[] = [];
+  const stableCampaigns: any[] = [];
+
+  campaigns.forEach(campaign => {
+    // Only process campaigns that have required fields
+    if (campaign.totals && campaign.verdict) {
+      if (campaign.verdict.category === "underperforming") {
+        // Cast to match expected type
+        underperformingCampaigns.push(campaign as any);
+      } else {
+        // All other categories go to stable
+        stableCampaigns.push(campaign as any);
+      }
+    }
+  });
+
+  return {
+    underperforming: underperformingCampaigns,
+    stable: stableCampaigns
+  };
+};
 // ===== Initial State =====
 const initialState: FacebookAdsState = {
   adAccounts: [],
   campaigns: [],
   insights: [],
   campaignInsights: [],
-
   campaignInsightstotal: [],
   aggregatedStats: null,
   selectedAccount: "",
@@ -273,13 +297,13 @@ const initialState: FacebookAdsState = {
   topCampaign: [],
   stableCampaigns: [],
   underperforming: [],
-  campaignAnalysis: [], // 🔹 new
-  overallTotals: null,  // 🔹 new
-  loadingCampaigns: false, // 🔹 new
-  loadingTotals: false,    // 🔹 new
+  campaignAnalysis: [],
+  overallTotals: null,
+  loadingCampaigns: false,
+  loadingTotals: false,
 };
 
-// ===== Thunks =====
+// ===== Thunks ===== (unchanged)
 export const fetchAdAccounts = createAsyncThunk("facebookAds/fetchAdAccounts", async (_, { rejectWithValue }) => {
   const token = getAccessToken();
   if (!token) return rejectWithValue("No access token found");
@@ -373,7 +397,7 @@ const facebookAdsSlice = createSlice({
   name: "facebookAds",
   initialState,
   reducers: {
-    // (your apprentice’s reducers unchanged)
+    // (your existing reducers unchanged)
     clearAllData: state => {
       Object.assign(state, initialState);
       if (typeof window !== "undefined") localStorage.removeItem("FB_ACCESS_TOKEN");
@@ -391,7 +415,6 @@ const facebookAdsSlice = createSlice({
     setSelectedCampaign: (state, action: PayloadAction<string>) => {
       state.selectedCampaign = action.payload;
       state.campaignInsights = [];
-
       state.campaignInsightstotal = [];
     },
     setDateFilter: (state, action: PayloadAction<string>) => {
@@ -473,20 +496,30 @@ const facebookAdsSlice = createSlice({
         state.error = action.payload as string;
       })
 
-      // ===== Insights (Totals) =====
+      // ===== Insights (Totals) ===== 🔥 UPDATED
       .addCase(fetchInsights.pending, (state) => {
         state.loadingTotals = true;
       })
       .addCase(fetchInsights.fulfilled, (state, action) => {
         state.loadingTotals = false;
         const data = action.payload;
+
+        // Set basic data from API response
         state.overallTotals = data.overallTotals || null;
         state.campaignAnalysis = data.campaignAnalysis || [];
         state.topCampaign = data.topCampaign || [];
-        state.stableCampaigns = data.stableCampaigns || [];
-        state.underperforming = data.underperforming || [];
         state.insights = data.insights || [];
+
+        // 🔥 NEW: Separate campaigns by category instead of using API arrays
+        const { underperforming, stable } = separateCampaignsByCategory(state.campaignAnalysis);
+
+        state.underperforming = underperforming;
+        state.stableCampaigns = stable;
+
+        // Calculate aggregated stats
         state.aggregatedStats = calculateAggregatedStats(state.insights);
+
+        console.log(`✅ Separated campaigns: ${underperforming.length} underperforming, ${stable.length} stable`);
       })
       .addCase(fetchInsights.rejected, (state, action) => {
         state.loadingTotals = false;
@@ -507,7 +540,6 @@ const facebookAdsSlice = createSlice({
         state.error = action.payload as string;
       });
   }
-
 });
 
 export const {

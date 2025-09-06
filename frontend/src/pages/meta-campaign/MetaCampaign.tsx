@@ -80,7 +80,7 @@ const MetaCampaign: React.FC = () => {
   const { toast } = useToast();
 
   // Facebook OAuth configuration
-  const FB_APP_ID = "1433639251348083"; // Your Facebook App ID
+  const FB_APP_ID = import.meta.env.VITE_FACEBOOK_APP_ID; // Your Facebook App ID
   const REDIRECT_URI = window.location.origin + "/dashboard";
   const SCOPES = "ads_management,ads_read,business_management";
 

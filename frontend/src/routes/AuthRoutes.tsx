@@ -6,7 +6,6 @@ import ProfileUpdate from "@/pages/profile-update/ProfileUpdate";
 import SearchHistory from "@/pages/search-history/SearchHistory";
 import Index from "@/pages/Index";
 import BillingHistory from "@/pages/billing-history/BillingHistory";
-import { DashboardTest, LoginButton } from "@/pages/test/Test";
 import Dashboard from "@/pages/dashboard/Dashboard";
 import MetaCampaign from "@/pages/meta-campaign/MetaCampaign";
 import AnalyticsPage from "@/pages/analytics-page/AnalyticsPage";
@@ -28,8 +27,6 @@ const AuthRoutes = () => {
       <Route path="/meta-campaign" element={<MetaCampaign />} />
       <Route path="/search-history" element={<SearchHistory />} />
       <Route path="/billing-history" element={<BillingHistory />} />
-      {/* <Route path="/login-test" element={<LoginButton />} />
-      <Route path="/Campaign" element={<DashboardTest />} /> */}
       <Route path="/analytics" element={<AnalyticsPage />} />
     </>
   );

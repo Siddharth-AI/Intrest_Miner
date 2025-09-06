@@ -20,6 +20,10 @@ import {
   ClockIcon,
   MagnifyingGlassIcon,
   TableCellsIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronDoubleLeftIcon,
+  ChevronDoubleRightIcon,
 } from "@heroicons/react/24/outline";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import {
@@ -35,8 +39,14 @@ const CampaignModal: React.FC = () => {
   const [sortBy, setSortBy] = useState("spend");
   const [sortOrder, setSortOrder] = useState("desc");
 
+  // 🔥 NEW: Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage] = useState(8); // Fixed at 8 rows per page
+
   const { showModal, selectedCampaignForModal, campaignInsights, loading } =
     useAppSelector((state) => state.facebookAds);
+
+  console.log(campaignInsights, "campaign insight =>>>>>>>>>>>>>>>>>>>>>>>>>");
 
   // Theme detection
   useEffect(() => {
@@ -66,6 +76,7 @@ const CampaignModal: React.FC = () => {
     setSearchTerm("");
     setSortBy("spend");
     setSortOrder("desc");
+    setCurrentPage(1); // 🔥 Reset pagination on close
   };
 
   // Handle escape key and prevent event bubbling
@@ -80,7 +91,6 @@ const CampaignModal: React.FC = () => {
 
     if (showModal) {
       document.addEventListener("keydown", handleEscape, true);
-      // Prevent body scroll
       document.body.style.overflow = "hidden";
     }
 
@@ -135,14 +145,12 @@ const CampaignModal: React.FC = () => {
     }
   };
 
-  // Process campaign insights data - FIXED TYPE ISSUES
+  // Process campaign insights data
   const processedData = useMemo(() => {
-    // Check if campaignInsights is the full response object or just array
     if (!campaignInsights) {
       return { totals: null, insights: [] };
     }
 
-    // If campaignInsights is the full response object (with totals and insights properties)
     if (
       typeof campaignInsights === "object" &&
       "totals" in campaignInsights &&
@@ -154,7 +162,6 @@ const CampaignModal: React.FC = () => {
       };
     }
 
-    // If campaignInsights is just an array (fallback)
     if (Array.isArray(campaignInsights)) {
       return {
         totals: null,
@@ -186,12 +193,81 @@ const CampaignModal: React.FC = () => {
     return filtered;
   }, [processedData.insights, searchTerm, sortBy, sortOrder]);
 
+  // 🔥 NEW: Pagination logic
+  const paginationData = useMemo(() => {
+    const totalItems = filteredInsights.length;
+    const totalPages = Math.ceil(totalItems / rowsPerPage);
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    const currentPageInsights = filteredInsights.slice(startIndex, endIndex);
+
+    return {
+      totalItems,
+      totalPages,
+      currentPageInsights,
+      startIndex,
+      endIndex: Math.min(endIndex, totalItems),
+    };
+  }, [filteredInsights, currentPage, rowsPerPage]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortBy, sortOrder]);
+
+  // 🔥 NEW: Pagination handlers
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= paginationData.totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const handleFirstPage = () => setCurrentPage(1);
+  const handleLastPage = () => setCurrentPage(paginationData.totalPages);
+  const handlePrevPage = () => setCurrentPage(Math.max(1, currentPage - 1));
+  const handleNextPage = () =>
+    setCurrentPage(Math.min(paginationData.totalPages, currentPage + 1));
+
+  // 🔥 NEW: Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const { totalPages } = paginationData;
+    const pages = [];
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      const start = Math.max(1, currentPage - 2);
+      const end = Math.min(totalPages, start + maxVisible - 1);
+
+      if (start > 1) {
+        pages.push(1);
+        if (start > 2) pages.push("...");
+      }
+
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+
+      if (end < totalPages) {
+        if (end < totalPages - 1) pages.push("...");
+        pages.push(totalPages);
+      }
+    }
+
+    return pages;
+  };
+
   // Extract action values for specific actions
   const getActionValue = (insight: any, actionType: string) => {
-    if (!insight.action_values) return "₹0";
-    const action = insight.action_values.find(
+    console.log("insight===>>>", insight);
+    if (!insight.actions) return "₹0";
+    const action = insight.actions.find(
       (a: any) => a.action_type === actionType
     );
+    console.log(action, "====>action");
     return action ? formatCurrency(parseFloat(action.value)) : "₹0";
   };
 
@@ -311,7 +387,7 @@ const CampaignModal: React.FC = () => {
               e.preventDefault();
               e.stopPropagation();
             }}>
-            {/* Header - FIXED */}
+            {/* Header */}
             <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 flex-shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
@@ -343,7 +419,7 @@ const CampaignModal: React.FC = () => {
               </div>
             </div>
 
-            {/* Content - FIXED SCROLL */}
+            {/* Content */}
             <div className="flex-1 overflow-y-auto overscroll-contain">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
@@ -517,8 +593,22 @@ const CampaignModal: React.FC = () => {
                       </div>
                     </div>
 
-                    {filteredInsights.length > 0 ? (
-                      <div className="overflow-x-scroll bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                    {/* 🔥 NEW: Pagination Info */}
+                    <div className="px-6 py-3 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-t-lg">
+                      <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                        <span>
+                          Showing {paginationData.startIndex + 1} to{" "}
+                          {paginationData.endIndex} of{" "}
+                          {paginationData.totalItems} insights
+                        </span>
+                        <span>
+                          Page {currentPage} of {paginationData.totalPages}
+                        </span>
+                      </div>
+                    </div>
+
+                    {paginationData.currentPageInsights.length > 0 ? (
+                      <div className="overflow-x-scroll bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-t-0">
                         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                           <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
                             <tr>
@@ -570,7 +660,7 @@ const CampaignModal: React.FC = () => {
                             </tr>
                           </thead>
                           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            {filteredInsights.map(
+                            {paginationData.currentPageInsights.map(
                               (insight: any, index: number) => (
                                 <motion.tr
                                   key={`${insight.adset_id}-${insight.ad_id}-${index}`}
@@ -578,10 +668,10 @@ const CampaignModal: React.FC = () => {
                                   animate={{ opacity: 1, x: 0 }}
                                   transition={{ delay: index * 0.03 }}
                                   className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
-                                  {/* Sno */}
+                                  {/* S.No */}
                                   <td className="px-4 py-4 whitespace-nowrap">
                                     <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                      {index + 1}
+                                      {paginationData.startIndex + index + 1}
                                     </div>
                                   </td>
                                   {/* Ad Set */}
@@ -748,7 +838,7 @@ const CampaignModal: React.FC = () => {
                         </table>
                       </div>
                     ) : (
-                      <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-b-lg border border-gray-200 dark:border-gray-700 border-t-0">
                         <TableCellsIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                           No Ad Insights Found
@@ -765,6 +855,94 @@ const CampaignModal: React.FC = () => {
                             Clear Search
                           </button>
                         )}
+                      </div>
+                    )}
+
+                    {/* 🔥 NEW: Pagination Controls */}
+                    {paginationData.totalPages > 1 && (
+                      <div className="px-6 py-4 border border-gray-200 dark:border-gray-700 border-t-0 bg-gray-50 dark:bg-gray-900/50 rounded-b-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            {/* First Page */}
+                            <button
+                              onClick={handleFirstPage}
+                              disabled={currentPage === 1}
+                              className={`p-2 rounded-lg border transition-colors ${
+                                currentPage === 1
+                                  ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                  : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                              }`}>
+                              <ChevronDoubleLeftIcon className="h-4 w-4" />
+                            </button>
+
+                            {/* Previous Page */}
+                            <button
+                              onClick={handlePrevPage}
+                              disabled={currentPage === 1}
+                              className={`p-2 rounded-lg border transition-colors ${
+                                currentPage === 1
+                                  ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                  : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                              }`}>
+                              <ChevronLeftIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          {/* Page Numbers */}
+                          <div className="flex items-center space-x-1">
+                            {getPageNumbers().map((page, index) => (
+                              <React.Fragment key={index}>
+                                {page === "..." ? (
+                                  <span className="px-3 py-2 text-gray-500">
+                                    ...
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() =>
+                                      handlePageChange(page as number)
+                                    }
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                      currentPage === page
+                                        ? "bg-blue-600 text-white"
+                                        : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                                    }`}>
+                                    {page}
+                                  </button>
+                                )}
+                              </React.Fragment>
+                            ))}
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            {/* Next Page */}
+                            <button
+                              onClick={handleNextPage}
+                              disabled={
+                                currentPage === paginationData.totalPages
+                              }
+                              className={`p-2 rounded-lg border transition-colors ${
+                                currentPage === paginationData.totalPages
+                                  ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                  : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                              }`}>
+                              <ChevronRightIcon className="h-4 w-4" />
+                            </button>
+
+                            {/* Last Page */}
+                            <button
+                              onClick={handleLastPage}
+                              disabled={
+                                currentPage === paginationData.totalPages
+                              }
+                              className={`p-2 rounded-lg border transition-colors ${
+                                currentPage === paginationData.totalPages
+                                  ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                  : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                              }`}>
+                              <ChevronDoubleRightIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>

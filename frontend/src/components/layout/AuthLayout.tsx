@@ -47,12 +47,6 @@ export default function AuthLayout() {
           </div>
           <Footer />
         </main>
-
-        {/* Footer - Responsive margins */}
-        {/* <div className="sm:ml-[20rem] transition-all duration-300">
-          <Footer />
-        </div> */}
-        {/* 🎯 Modal at Layout Level - Overlays Everything */}
         <CampaignModal />
         <AnalyticsModal />
       </div>

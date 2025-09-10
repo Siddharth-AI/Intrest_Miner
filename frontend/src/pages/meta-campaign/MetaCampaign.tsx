@@ -74,6 +74,7 @@ const MetaCampaign: React.FC = () => {
     });
     return () => observer.disconnect();
   }, []);
+
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
 
@@ -84,26 +85,13 @@ const MetaCampaign: React.FC = () => {
   const REDIRECT_URI = window.location.origin + "/dashboard";
   const SCOPES = "ads_management,ads_read,business_management";
 
-  // **MAIN FIX: OAuth Token Handler**
+  // **SIMPLIFIED: Just check if token exists**
   useEffect(() => {
-    console.log("🚀 MetaCampaign component loaded");
-    console.log("📍 Current URL:", window.location.href);
-    console.log("📍 URL Hash:", window.location.hash);
-    console.log("📍 URL Search:", window.location.search);
-
-    const handleFacebookCallback = async () => {
-      // Check for existing connection first
-      const existingToken = localStorage.getItem("FB_ACCESS_TOKEN");
-      if (existingToken) {
-        console.log(
-          "✅ Found existing token in localStorage:",
-          existingToken.substring(0, 20) + "..."
-        );
-        setIsConnected(true);
-        return;
-      }
-    };
-    handleFacebookCallback();
+    const existingToken = localStorage.getItem("FB_ACCESS_TOKEN");
+    if (existingToken) {
+      console.log("✅ Found existing token, user is connected");
+      setIsConnected(true);
+    }
   }, []);
 
   const connectMetaAccount = async () => {

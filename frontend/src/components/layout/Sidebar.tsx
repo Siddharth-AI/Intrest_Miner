@@ -145,12 +145,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, isCollapsed }) => {
       active: location.pathname === "/analytics",
       badge: "New",
     },
-    {
-      name: "Export Center",
-      icon: Download,
-      path: "/export",
-      active: location.pathname === "/export",
-    },
   ];
 
   const metaIntegration = [

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useCallback, useMemo } from "react";
+import React, { useEffect, useCallback, useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   EyeIcon,
@@ -36,6 +36,46 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+
+// Add this component to show token status
+const TokenStatus = () => {
+  const [tokenInfo, setTokenInfo] = useState<{
+    daysLeft: number;
+    isExpiring: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    const timestamp = localStorage.getItem("FB_TOKEN_TIMESTAMP");
+    if (timestamp) {
+      const tokenAge = Date.now() - parseInt(timestamp);
+      const daysOld = tokenAge / (1000 * 60 * 60 * 24);
+      const daysLeft = 60 - Math.floor(daysOld);
+
+      setTokenInfo({
+        daysLeft: Math.max(0, daysLeft),
+        isExpiring: daysLeft <= 10,
+      });
+    }
+  }, []);
+
+  if (!tokenInfo) return null;
+
+  return (
+    <div
+      className={`p-3 rounded-lg text-sm ${
+        tokenInfo.isExpiring
+          ? "bg-yellow-50 text-yellow-800 border border-yellow-200"
+          : "bg-green-50 text-green-800 border border-green-200"
+      }`}>
+      <span className="font-medium">
+        Token Status: {tokenInfo.daysLeft} days remaining
+      </span>
+      {tokenInfo.isExpiring && (
+        <span className="ml-2">⚠️ Please reconnect soon</span>
+      )}
+    </div>
+  );
+};
 
 // Enhanced Animation Variants
 const containerVariants: Variants = {
@@ -399,31 +439,106 @@ const Dashboard: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  // 🔥 ENHANCED OAuth logic with auto-fetch
+  // Add this function in your dashboard component
+  const exchangeForLongLivedToken = async (shortLivedToken: string) => {
+    try {
+      const FB_APP_ID = import.meta.env.VITE_FACEBOOK_APP_ID;
+      const FB_APP_SECRET = import.meta.env.VITE_FB_APP_SECRET;
+
+      const response = await fetch(
+        `https://graph.facebook.com/oauth/access_token?` +
+          `client_id=${FB_APP_ID}&` +
+          `client_secret=${FB_APP_SECRET}&` +
+          `grant_type=fb_exchange_token&` +
+          `fb_exchange_token=${shortLivedToken}`
+      );
+
+      const data = await response.json();
+
+      if (data.access_token) {
+        console.log("✅ Exchanged for long-lived token (60 days)");
+        return data.access_token;
+      } else {
+        console.error("❌ Token exchange failed:", data);
+        return shortLivedToken; // Return original if exchange fails
+      }
+    } catch (error) {
+      console.error("❌ Token exchange error:", error);
+      return shortLivedToken; // Return original if exchange fails
+    }
+  };
+
+  // **UPDATED: Your existing useEffect with token exchange**
   useEffect(() => {
     const hash = window.location.hash;
     if (hash && hash.includes("access_token")) {
       const hashParams = new URLSearchParams(hash.substring(1));
-      const token = hashParams.get("access_token");
-      if (token) {
-        localStorage.setItem("FB_ACCESS_TOKEN", token);
-        window.history.replaceState(
-          {},
-          document.title,
-          window.location.pathname
-        );
-        dispatch(fetchAdAccounts());
+      const shortLivedToken = hashParams.get("access_token");
 
-        // Success animation
-        controls.start({
-          scale: [1, 1.05, 1],
-          transition: { duration: 0.5 },
-        });
+      if (shortLivedToken) {
+        console.log(
+          "📝 Short-lived token received, exchanging for long-lived..."
+        );
+
+        // **NEW: Exchange for long-lived token**
+        const processToken = async () => {
+          try {
+            const longLivedToken = await exchangeForLongLivedToken(
+              shortLivedToken
+            );
+
+            // Store long-lived token with timestamp
+            localStorage.setItem("FB_ACCESS_TOKEN", longLivedToken);
+            localStorage.setItem("FB_TOKEN_TIMESTAMP", Date.now().toString());
+
+            // Clear URL hash
+            window.history.replaceState(
+              {},
+              document.title,
+              window.location.pathname
+            );
+
+            // Fetch ad accounts with long-lived token
+            dispatch(fetchAdAccounts());
+
+            // Success animation
+            controls.start({
+              scale: [1, 1.05, 1],
+              transition: { duration: 0.5 },
+            });
+
+            console.log("✅ Long-lived token stored and ad accounts fetched");
+          } catch (error) {
+            console.error("❌ Error processing token:", error);
+            // Fallback: use short-lived token
+            localStorage.setItem("FB_ACCESS_TOKEN", shortLivedToken);
+            dispatch(fetchAdAccounts());
+          }
+        };
+
+        processToken();
       }
     } else {
       // 🔥 AUTO-FETCH: Automatically fetch ad accounts if token exists
       const existingToken = localStorage.getItem("FB_ACCESS_TOKEN");
       if (existingToken && adAccounts.length === 0) {
+        // **NEW: Check token expiry before using**
+        const tokenTimestamp = localStorage.getItem("FB_TOKEN_TIMESTAMP");
+        if (tokenTimestamp) {
+          const tokenAge = Date.now() - parseInt(tokenTimestamp);
+          const daysOld = tokenAge / (1000 * 60 * 60 * 24);
+
+          if (daysOld > 60) {
+            console.log("🚨 Token expired, please reconnect");
+            localStorage.removeItem("FB_ACCESS_TOKEN");
+            localStorage.removeItem("FB_TOKEN_TIMESTAMP");
+            // Redirect to connection page or show reconnect UI
+            return;
+          } else if (daysOld > 50) {
+            console.log("⚠️ Token expires soon, consider refreshing");
+          }
+        }
+
         dispatch(fetchAdAccounts());
       }
     }
@@ -468,7 +583,7 @@ const Dashboard: React.FC = () => {
   // 🔥 AUTO-FETCH: Overall insights when account and campaigns are ready
   useEffect(() => {
     if (selectedAccount && campaigns.length > 0) {
-      dispatch(fetchInsights());
+      dispatch(fetchInsights(false));
     }
   }, [selectedAccount, campaigns.length, dispatch]);
 
@@ -501,7 +616,7 @@ const Dashboard: React.FC = () => {
     try {
       if (selectedAccount) {
         await dispatch(fetchCampaigns(selectedAccount)).unwrap();
-        await dispatch(fetchInsights()).unwrap();
+        await dispatch(fetchInsights(false)).unwrap();
 
         toast({
           title: "Data Refreshed",
@@ -812,6 +927,7 @@ const Dashboard: React.FC = () => {
                   </motion.div>
                   {isRefreshing ? "Refreshing..." : "Refresh Data"}
                 </motion.button>
+                {TokenStatus()}
               </div>
 
               {/* Enhanced selectors */}

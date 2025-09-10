@@ -152,7 +152,7 @@ export default function UserHeader({
             </motion.button>
 
             {/* Notifications */}
-            <motion.button
+            {/* <motion.button
               ref={bellRef}
               onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
               className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 relative"
@@ -160,7 +160,7 @@ export default function UserHeader({
               whileTap={{ scale: 0.95 }}
               aria-label="Notifications">
               <Bell className="w-5 h-5" />
-            </motion.button>
+            </motion.button> */}
 
             {/* Profile - Hide on mobile since it's in sidebar */}
             {/* <motion.button

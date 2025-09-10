@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 
-// ===== Types ===== (unchanged)
+// ===== Types ===== (keeping all your existing types)
 export interface AdAccount {
   id: string;
   name: string;
@@ -164,6 +164,7 @@ interface underperforming {
   };
 }
 
+// 🔥 Enhanced State with FIXED Caching
 interface FacebookAdsState {
   adAccounts: AdAccount[];
   campaigns: Campaign[];
@@ -186,7 +187,7 @@ interface FacebookAdsState {
   error: string | null;
   lastUpdated: string | null;
 
-  // 🔹 New for AnalyticsPage
+  // Your existing AnalyticsPage fields
   campaignAnalysis: Campaign[];
   overallTotals: any | null;
   loadingCampaigns: boolean;
@@ -194,6 +195,14 @@ interface FacebookAdsState {
   topCampaign: TopCampaign[];
   stableCampaigns: StableCampaigns[];
   underperforming: underperforming[];
+
+  // 🔥 NEW: Optimized caching fields
+  insightsCache: Record<string, {
+    data: any;
+    timestamp: number;
+    expiresIn: number;
+  }>;
+  insightsLastUpdated: Record<string, number>;
 }
 
 // ===== Helpers =====
@@ -201,6 +210,7 @@ const getAccessToken = () => localStorage.getItem("FB_ACCESS_TOKEN");
 
 const calculateAggregatedStats = (insights: InsightData[]): AggregatedStats | null => {
   if (!insights.length) return null;
+
   const totals = {
     spend: 0,
     impressions: 0,
@@ -233,7 +243,6 @@ const calculateAggregatedStats = (insights: InsightData[]): AggregatedStats | nu
   });
 
   const count = insights.length;
-
   return {
     totalSpend: totals.spend,
     totalImpressions: totals.impressions,
@@ -249,19 +258,15 @@ const calculateAggregatedStats = (insights: InsightData[]): AggregatedStats | nu
   };
 };
 
-// 🔥 NEW: Helper function to safely separate campaigns
 const separateCampaignsByCategory = (campaigns: Campaign[]) => {
   const underperformingCampaigns: any[] = [];
   const stableCampaigns: any[] = [];
 
   campaigns.forEach(campaign => {
-    // Only process campaigns that have required fields
     if (campaign.totals && campaign.verdict) {
       if (campaign.verdict.category === "underperforming") {
-        // Cast to match expected type
         underperformingCampaigns.push(campaign as any);
       } else {
-        // All other categories go to stable
         stableCampaigns.push(campaign as any);
       }
     }
@@ -272,8 +277,22 @@ const separateCampaignsByCategory = (campaigns: Campaign[]) => {
     stable: stableCampaigns
   };
 };
-// ===== Initial State =====
+
+// 🔥 NEW: FIXED Cache management helpers
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+
+const generateCacheKey = (accountId: string, dateFilter: string, customDateRange: any) => {
+  return `${accountId}_${dateFilter}_${customDateRange.since || 'none'}_${customDateRange.until || 'none'}`;
+};
+
+const isCacheValid = (cacheEntry: any) => {
+  if (!cacheEntry) return false;
+  return Date.now() - cacheEntry.timestamp < cacheEntry.expiresIn;
+};
+
+// ===== Enhanced Initial State =====
 const initialState: FacebookAdsState = {
+  // All your existing state
   adAccounts: [],
   campaigns: [],
   insights: [],
@@ -301,12 +320,17 @@ const initialState: FacebookAdsState = {
   overallTotals: null,
   loadingCampaigns: false,
   loadingTotals: false,
+
+  // 🔥 NEW: Caching initialization
+  insightsCache: {},
+  insightsLastUpdated: {},
 };
 
-// ===== Thunks ===== (unchanged)
+// ===== Your Existing Thunks (unchanged) =====
 export const fetchAdAccounts = createAsyncThunk("facebookAds/fetchAdAccounts", async (_, { rejectWithValue }) => {
   const token = getAccessToken();
   if (!token) return rejectWithValue("No access token found");
+
   try {
     const res = await fetch(`${import.meta.env.VITE_INTEREST_MINER_API_URL}/api/adaccounts`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -321,6 +345,7 @@ export const fetchAdAccounts = createAsyncThunk("facebookAds/fetchAdAccounts", a
 export const fetchCampaigns = createAsyncThunk("facebookAds/fetchCampaigns", async (accountId: string, { rejectWithValue }) => {
   const token = getAccessToken();
   if (!token) return rejectWithValue("No access token found");
+
   try {
     const res = await fetch(`${import.meta.env.VITE_INTEREST_MINER_API_URL}/api/campaigns/${accountId}`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -332,34 +357,83 @@ export const fetchCampaigns = createAsyncThunk("facebookAds/fetchCampaigns", asy
   }
 });
 
-export const fetchInsights = createAsyncThunk("facebookAds/fetchInsights", async (_, { getState, rejectWithValue }) => {
-  const state = getState() as { facebookAds: FacebookAdsState };
-  const { selectedAccount, dateFilter, customDateRange } = state.facebookAds;
-  const token = getAccessToken();
-  if (!token) return rejectWithValue("No access token found");
+// 🔥 FIXED: fetchInsights thunk with proper caching and state management
+export const fetchInsights = createAsyncThunk(
+  "facebookAds/fetchInsights",
+  async (forceRefresh: boolean = false, { getState, rejectWithValue }) => {
+    const state = getState() as { facebookAds: FacebookAdsState };
+    const { selectedAccount, dateFilter, customDateRange, insightsCache } = state.facebookAds;
 
-  try {
-    const body: any = {
-      mode: "analyze",
-      adAccountId: selectedAccount
-    };
-    if (dateFilter === "custom") {
-      body.date_start = customDateRange.since;
-      body.date_stop = customDateRange.until;
+    if (!selectedAccount) {
+      return rejectWithValue("No account selected");
     }
 
-    const res = await fetch(`${import.meta.env.VITE_INTEREST_MINER_API_URL}/api/insights`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    return await res.json();
-  } catch (err: any) {
-    return rejectWithValue(err.message || "Failed to fetch insights");
-  }
-});
+    const cacheKey = generateCacheKey(selectedAccount, dateFilter, customDateRange);
 
+    // 🔥 Check cache first, but allow force refresh
+    if (!forceRefresh) {
+      const cachedData = insightsCache[cacheKey];
+      if (isCacheValid(cachedData)) {
+        console.log(`✅ Using cached insights for ${selectedAccount}`);
+        // Return cached data with special flag to update UI properly
+        return {
+          ...cachedData.data,
+          fromCache: true,
+          cacheKey,
+          timestamp: cachedData.timestamp
+        };
+      }
+    }
+
+    const token = getAccessToken();
+    if (!token) return rejectWithValue("No access token found");
+
+    try {
+      console.log(`🔄 Fetching fresh insights for ${selectedAccount}`);
+
+      const body: any = {
+        mode: "analyze",
+        adAccountId: selectedAccount
+      };
+
+      if (dateFilter === "custom") {
+        body.date_start = customDateRange.since;
+        body.date_stop = customDateRange.until;
+      }
+
+      const res = await fetch(`${import.meta.env.VITE_INTEREST_MINER_API_URL}/api/insights`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const data = await res.json();
+
+      return { ...data, cacheKey, timestamp: Date.now(), fromCache: false };
+    } catch (err: any) {
+      return rejectWithValue(err.message || "Failed to fetch insights");
+    }
+  }
+);
+
+// 🔥 NEW: Debounced insights fetcher (simplified)
+let debounceTimer: NodeJS.Timeout;
+
+export const fetchInsightsDebounced = createAsyncThunk(
+  "facebookAds/fetchInsightsDebounced",
+  async (_, { dispatch }) => {
+    clearTimeout(debounceTimer);
+    return new Promise((resolve) => {
+      debounceTimer = setTimeout(async () => {
+        const result = await dispatch(fetchInsights(false));
+        resolve(result.payload);
+      }, 1000);
+    });
+  }
+);
+
+// Your existing campaign insights thunk (unchanged)
 export const fetchCampaignInsights = createAsyncThunk(
   "facebookAds/fetchCampaignInsights",
   async (campaignId: string, { getState, rejectWithValue }) => {
@@ -384,6 +458,7 @@ export const fetchCampaignInsights = createAsyncThunk(
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       });
+
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       return await res.json();
     } catch (err: any) {
@@ -392,16 +467,17 @@ export const fetchCampaignInsights = createAsyncThunk(
   }
 );
 
-// ===== Slice =====
+// ===== FIXED Slice =====
 const facebookAdsSlice = createSlice({
   name: "facebookAds",
   initialState,
   reducers: {
-    // (your existing reducers unchanged)
+    // All your existing reducers (unchanged)
     clearAllData: state => {
       Object.assign(state, initialState);
       if (typeof window !== "undefined") localStorage.removeItem("FB_ACCESS_TOKEN");
     },
+
     setSelectedAccount: (state, action: PayloadAction<string>) => {
       state.selectedAccount = action.payload;
       state.campaigns = [];
@@ -412,11 +488,13 @@ const facebookAdsSlice = createSlice({
       state.searchTerm = "";
       state.statusFilter = "all";
     },
+
     setSelectedCampaign: (state, action: PayloadAction<string>) => {
       state.selectedCampaign = action.payload;
       state.campaignInsights = [];
       state.campaignInsightstotal = [];
     },
+
     setDateFilter: (state, action: PayloadAction<string>) => {
       state.dateFilter = action.payload;
       if (action.payload !== "custom") {
@@ -426,15 +504,19 @@ const facebookAdsSlice = createSlice({
         state.showCustomDatePicker = true;
       }
     },
+
     setCustomDateRange: (state, action: PayloadAction<CustomDateRange>) => {
       state.customDateRange = action.payload;
     },
+
     setSearchTerm: (state, action: PayloadAction<string>) => {
       state.searchTerm = action.payload;
     },
+
     setStatusFilter: (state, action: PayloadAction<string>) => {
       state.statusFilter = action.payload;
     },
+
     setShowModal: (state, action: PayloadAction<boolean>) => {
       state.showModal = action.payload;
       if (!action.payload) {
@@ -442,32 +524,51 @@ const facebookAdsSlice = createSlice({
         state.campaignInsights = [];
       }
     },
+
     setShowCustomDatePicker: (state, action: PayloadAction<boolean>) => {
       state.showCustomDatePicker = action.payload;
     },
+
     setSelectedCampaignForModal: (state, action: PayloadAction<Campaign | null>) => {
       state.selectedCampaignForModal = action.payload;
     },
+
     clearError: (state) => {
       state.error = null;
     },
+
     calculateStats: (state) => {
       state.aggregatedStats = calculateAggregatedStats(state.insights);
     },
+
     setShowAnalyticsModal: (state, action: PayloadAction<boolean>) => {
       state.showAnalyticsModal = action.payload;
     },
-    setAnalysisResults: (state, action: PayloadAction<any>) => { },
+
+    setAnalysisResults: (state, action: PayloadAction<any>) => {
+      // Keep your existing logic here
+    },
+
     resetFilters: (state) => {
       state.searchTerm = "";
       state.statusFilter = "all";
       state.dateFilter = "maximum";
       state.customDateRange = { since: "", until: "" };
     },
+
+    // 🔥 NEW: Cache management reducers
+    invalidateInsightsCache: (state, action: PayloadAction<string>) => {
+      const accountId = action.payload;
+      Object.keys(state.insightsCache).forEach(key => {
+        if (key.startsWith(accountId)) {
+          state.insightsCache[key].expiresIn = 0; // Force expiry
+        }
+      });
+    },
   },
   extraReducers: (builder) => {
     builder
-      // ===== Ad Accounts =====
+      // All your existing cases (unchanged)
       .addCase(fetchAdAccounts.pending, (state) => {
         state.loading = true;
         state.initialLoading = true;
@@ -483,7 +584,6 @@ const facebookAdsSlice = createSlice({
         state.error = action.payload as string;
       })
 
-      // ===== Campaigns =====
       .addCase(fetchCampaigns.pending, (state) => {
         state.loadingCampaigns = true;
       })
@@ -496,37 +596,73 @@ const facebookAdsSlice = createSlice({
         state.error = action.payload as string;
       })
 
-      // ===== Insights (Totals) ===== 🔥 UPDATED
+      // 🔥 FIXED: Insights with proper loading and caching
       .addCase(fetchInsights.pending, (state) => {
+        console.log('🔄 fetchInsights.pending - Setting loadingTotals = true');
         state.loadingTotals = true;
+        state.error = null;
       })
       .addCase(fetchInsights.fulfilled, (state, action) => {
-        state.loadingTotals = false;
+        console.log('✅ fetchInsights.fulfilled - Processing data');
         const data = action.payload;
 
-        // Set basic data from API response
+        state.loadingTotals = false;
+        state.error = null;
+
+        // 🔥 FIXED: Always update state with data (cached or fresh)
         state.overallTotals = data.overallTotals || null;
         state.campaignAnalysis = data.campaignAnalysis || [];
         state.topCampaign = data.topCampaign || [];
         state.insights = data.insights || [];
 
-        // 🔥 NEW: Separate campaigns by category instead of using API arrays
+        // Process campaigns by category
         const { underperforming, stable } = separateCampaignsByCategory(state.campaignAnalysis);
-
         state.underperforming = underperforming;
         state.stableCampaigns = stable;
 
         // Calculate aggregated stats
         state.aggregatedStats = calculateAggregatedStats(state.insights);
 
-        console.log(`✅ Separated campaigns: ${underperforming.length} underperforming, ${stable.length} stable`);
+        // 🔥 FIXED: Handle caching properly
+        if (!data.fromCache) {
+          // Store fresh data in cache
+          const cacheEntry = {
+            data: {
+              overallTotals: data.overallTotals,
+              campaignAnalysis: data.campaignAnalysis,
+              topCampaign: data.topCampaign,
+              insights: data.insights,
+            },
+            timestamp: data.timestamp || Date.now(),
+            expiresIn: CACHE_DURATION,
+          };
+
+          state.insightsCache[data.cacheKey] = cacheEntry;
+          state.insightsLastUpdated[state.selectedAccount] = Date.now();
+
+          console.log(`💾 Fresh data cached: ${data.cacheKey}`);
+        } else {
+          console.log(`📦 Using cached data: ${data.cacheKey}`);
+        }
+
+        console.log(`✅ Data processed: ${underperforming.length} underperforming, ${stable.length} stable`);
       })
       .addCase(fetchInsights.rejected, (state, action) => {
+        console.log('❌ fetchInsights.rejected');
         state.loadingTotals = false;
         state.error = action.payload as string;
       })
 
-      // ===== Single Campaign Insights =====
+      // Handle debounced insights
+      .addCase(fetchInsightsDebounced.pending, (state) => {
+        // Optional: You can set loading here too
+        state.loadingTotals = true;
+      })
+      .addCase(fetchInsightsDebounced.fulfilled, (state) => {
+        // Handled by fetchInsights.fulfilled
+      })
+
+      // Your existing campaign insights cases (unchanged)
       .addCase(fetchCampaignInsights.pending, (state) => {
         state.loading = true;
       })
@@ -543,6 +679,7 @@ const facebookAdsSlice = createSlice({
 });
 
 export const {
+  // All your existing exports
   setSelectedAccount,
   setSelectedCampaign,
   setDateFilter,
@@ -558,6 +695,9 @@ export const {
   setAnalysisResults,
   clearAllData,
   resetFilters,
+
+  // 🔥 NEW: Cache management exports
+  invalidateInsightsCache,
 } = facebookAdsSlice.actions;
 
 export default facebookAdsSlice.reducer;

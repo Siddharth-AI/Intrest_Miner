@@ -27,7 +27,14 @@ const AuthRoutes = () => {
       <Route path="/meta-campaign" element={<MetaCampaign />} />
       <Route path="/search-history" element={<SearchHistory />} />
       <Route path="/billing-history" element={<BillingHistory />} />
-      <Route path="/analytics" element={<AnalyticsPage />} />
+      <Route
+        path="/analytics"
+        element={
+          <RequireActivePlan>
+            <AnalyticsPage />
+          </RequireActivePlan>
+        }
+      />
     </>
   );
 };

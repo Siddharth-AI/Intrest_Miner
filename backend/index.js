@@ -14,7 +14,13 @@ const cron = require("node-cron");
 const { scheduleTokenRefresh } = require("./utils/facebookTokenManager");
 
 // Middleware
+// Allow all origins
 app.use(cors());
+
+// Or explicitly specify all origins
+app.use(cors({
+  origin: '*'
+}));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 

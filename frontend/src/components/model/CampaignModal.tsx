@@ -261,10 +261,20 @@ const CampaignModal: React.FC = () => {
   };
 
   // Extract action values for specific actions
+  const getActionType = (insight: any, actionType: string) => {
+    console.log("insight===>>>", insight);
+    if (!insight.actions) return "0";
+    const action = insight.actions.find(
+      (a: any) => a.action_type === actionType
+    );
+    console.log(action, "====>action");
+    return action ? parseFloat(action.value) : "0";
+  };
+
   const getActionValue = (insight: any, actionType: string) => {
     console.log("insight===>>>", insight);
-    if (!insight.actions) return "₹0";
-    const action = insight.actions.find(
+    if (!insight.cost_per_action_type) return "₹0";
+    const action = insight.cost_per_action_type.find(
       (a: any) => a.action_type === actionType
     );
     console.log(action, "====>action");
@@ -326,6 +336,22 @@ const CampaignModal: React.FC = () => {
         bgColor: "bg-pink-50 dark:bg-pink-900/20",
         textColor: "text-pink-600 dark:text-pink-400",
       },
+      {
+        title: "Total Lead",
+        value: `${totals.total_leads || 0}`,
+        icon: ArrowTrendingUpIcon,
+        color: "from-indigo-500 to-indigo-600",
+        bgColor: "bg-indigo-50 dark:bg-indigo-900/20",
+        textColor: "text-indigo-600 dark:text-indigo-400",
+      },
+      {
+        title: "Average Lead Cost",
+        value: formatCurrency(totals.average_lead_cost || 0),
+        icon: CurrencyRupeeIcon,
+        color: "from-orange-500 to-orange-600",
+        bgColor: "bg-orange-50 dark:bg-orange-900/20",
+        textColor: "text-orange-600 dark:text-orange-400",
+      },
     ];
   }, [processedData.totals]);
 
@@ -358,6 +384,12 @@ const CampaignModal: React.FC = () => {
         value: totals.actions.add_payment_info || 0,
         icon: CreditCardIcon,
         color: "bg-purple-500",
+      },
+      {
+        title: "Lead Cost",
+        value: totals?.cost_per_action_type.lead?.toFixed(2) || 0,
+        icon: BanknotesIcon,
+        color: "bg-green-500",
       },
     ];
   }, [processedData.totals]);
@@ -649,7 +681,10 @@ const CampaignModal: React.FC = () => {
                                 Buying Type
                               </th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                Action Values
+                                Action
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Action Value
                               </th>
                               <th className="min-w-[150px] px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                 Start Date
@@ -764,7 +799,62 @@ const CampaignModal: React.FC = () => {
                                     </div>
                                   </td>
 
-                                  {/* Action Values */}
+                                  {/* Action type */}
+                                  <td className="px-4 py-4">
+                                    <div className="grid grid-cols-2 gap-2 text-xs min-w-[200px]">
+                                      <div className="flex gap-2">
+                                        <span className="text-gray-500 block">
+                                          Add to Cart:
+                                        </span>
+                                        <span className="font-medium text-emerald-600">
+                                          {getActionType(
+                                            insight,
+                                            "add_to_cart"
+                                          )}
+                                        </span>
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <span className="text-gray-500 block">
+                                          Purchase:
+                                        </span>
+                                        <span className="font-medium text-green-600">
+                                          {getActionType(insight, "purchase")}
+                                        </span>
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <span className="text-gray-500 block">
+                                          Checkout:
+                                        </span>
+                                        <span className="font-medium text-blue-600">
+                                          {getActionType(
+                                            insight,
+                                            "initiate_checkout"
+                                          )}
+                                        </span>
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <span className="text-gray-500 block">
+                                          Payment:
+                                        </span>
+                                        <span className="font-medium text-purple-600">
+                                          {getActionType(
+                                            insight,
+                                            "add_payment_info"
+                                          )}
+                                        </span>
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <span className="text-gray-500 block">
+                                          Lead:
+                                        </span>
+                                        <span className="font-medium text-purple-600">
+                                          {getActionType(insight, "lead")}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* Action value */}
                                   <td className="px-4 py-4">
                                     <div className="grid grid-cols-2 gap-2 text-xs min-w-[200px]">
                                       <div className="flex gap-2">
@@ -808,8 +898,17 @@ const CampaignModal: React.FC = () => {
                                           )}
                                         </span>
                                       </div>
+                                      <div className="flex gap-2">
+                                        <span className="text-gray-500 block">
+                                          Lead:
+                                        </span>
+                                        <span className="font-medium text-purple-600">
+                                          {getActionValue(insight, "lead")}
+                                        </span>
+                                      </div>
                                     </div>
                                   </td>
+
                                   {/* Start Date */}
                                   <td className="px-4 py-4 whitespace-nowrap">
                                     <div className="text-sm text-gray-900 dark:text-white">

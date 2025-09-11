@@ -165,6 +165,7 @@ interface underperforming {
 }
 
 // 🔥 Enhanced State with FIXED Caching
+// 🔥 UPDATED: FacebookAdsState interface
 interface FacebookAdsState {
   adAccounts: AdAccount[];
   campaigns: Campaign[];
@@ -192,9 +193,13 @@ interface FacebookAdsState {
   overallTotals: any | null;
   loadingCampaigns: boolean;
   loadingTotals: boolean;
-  topCampaign: TopCampaign[];
-  stableCampaigns: StableCampaigns[];
-  underperforming: underperforming[];
+  topCampaign: any | null; // 🔥 CHANGED: from array to single object
+  stableCampaigns: any[];
+  underperforming: any[];
+
+  // 🔥 NEW: Additional campaign categories from API
+  excellentCampaigns: any[];
+  moderateCampaigns: any[];
 
   // 🔥 NEW: Optimized caching fields
   insightsCache: Record<string, {
@@ -204,6 +209,7 @@ interface FacebookAdsState {
   }>;
   insightsLastUpdated: Record<string, number>;
 }
+
 
 // ===== Helpers =====
 const getAccessToken = () => localStorage.getItem("FB_ACCESS_TOKEN");
@@ -313,7 +319,7 @@ const initialState: FacebookAdsState = {
   selectedCampaignForModal: null,
   error: null,
   lastUpdated: null,
-  topCampaign: [],
+  topCampaign: null, // 🔥 CHANGED: from [] to null
   stableCampaigns: [],
   underperforming: [],
   campaignAnalysis: [],
@@ -321,10 +327,15 @@ const initialState: FacebookAdsState = {
   loadingCampaigns: false,
   loadingTotals: false,
 
+  // 🔥 NEW: Additional campaign categories
+  excellentCampaigns: [],
+  moderateCampaigns: [],
+
   // 🔥 NEW: Caching initialization
   insightsCache: {},
   insightsLastUpdated: {},
 };
+
 
 // ===== Your Existing Thunks (unchanged) =====
 export const fetchAdAccounts = createAsyncThunk("facebookAds/fetchAdAccounts", async (_, { rejectWithValue }) => {
@@ -612,13 +623,21 @@ const facebookAdsSlice = createSlice({
         // 🔥 FIXED: Always update state with data (cached or fresh)
         state.overallTotals = data.overallTotals || null;
         state.campaignAnalysis = data.campaignAnalysis || [];
-        state.topCampaign = data.topCampaign || [];
+        state.topCampaign = data.topCampaign || null; // 🔥 CHANGED: single object
         state.insights = data.insights || [];
 
-        // Process campaigns by category
-        const { underperforming, stable } = separateCampaignsByCategory(state.campaignAnalysis);
-        state.underperforming = underperforming;
-        state.stableCampaigns = stable;
+        // 🔥 NEW: Handle new campaign categories from API
+        state.excellentCampaigns = data.excellentCampaigns || [];
+        state.stableCampaigns = data.stableCampaigns || [];
+        state.moderateCampaigns = data.moderateCampaigns || [];
+        state.underperforming = data.underperforming || [];
+
+        // Process campaigns by category (fallback for old API)
+        if (!data.excellentCampaigns && !data.stableCampaigns && !data.moderateCampaigns) {
+          const { underperforming, stable } = separateCampaignsByCategory(state.campaignAnalysis);
+          state.underperforming = underperforming;
+          state.stableCampaigns = stable;
+        }
 
         // Calculate aggregated stats
         state.aggregatedStats = calculateAggregatedStats(state.insights);
@@ -632,6 +651,11 @@ const facebookAdsSlice = createSlice({
               campaignAnalysis: data.campaignAnalysis,
               topCampaign: data.topCampaign,
               insights: data.insights,
+              // 🔥 NEW: Cache new categories
+              excellentCampaigns: data.excellentCampaigns,
+              stableCampaigns: data.stableCampaigns,
+              moderateCampaigns: data.moderateCampaigns,
+              underperforming: data.underperforming,
             },
             timestamp: data.timestamp || Date.now(),
             expiresIn: CACHE_DURATION,
@@ -645,7 +669,7 @@ const facebookAdsSlice = createSlice({
           console.log(`📦 Using cached data: ${data.cacheKey}`);
         }
 
-        console.log(`✅ Data processed: ${underperforming.length} underperforming, ${stable.length} stable`);
+        console.log(`✅ Data processed: ${state.excellentCampaigns.length} excellent, ${state.stableCampaigns.length} stable, ${state.moderateCampaigns.length} moderate, ${state.underperforming.length} underperforming`);
       })
       .addCase(fetchInsights.rejected, (state, action) => {
         console.log('❌ fetchInsights.rejected');

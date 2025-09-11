@@ -12,6 +12,8 @@ import {
   SparklesIcon,
   ArrowTrendingUpIcon,
   ClockIcon,
+  CursorArrowRaysIcon,
+  UsersIcon,
 } from "@heroicons/react/24/outline";
 import {
   motion,
@@ -803,25 +805,226 @@ const Dashboard: React.FC = () => {
 
   return (
     <>
-      <div className="relative">
-        {!hasToken && (
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-96 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl shadow-2xl p-8 text-center max-w-md">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">
-                Login Required
-              </h2>
-              <p className="text-gray-600 mb-6">
-                To view your campaign data, please log in with your Meta
-                account.
-              </p>
-              <button
-                onClick={() => router("/meta-campaign")}
-                className="px-6 py-3 bg-purple-600 text-white rounded-full font-semibold shadow-lg hover:bg-purple-700 transition-all duration-200">
-                Go to Meta Login
-              </button>
+      {!hasToken && (
+        <>
+          {" "}
+          <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 flex items-center justify-center relative overflow-hidden">
+            {/* Background Elements */}
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-300/20 dark:bg-blue-600/10 rounded-full blur-3xl animate-pulse"></div>
+              <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-300/20 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-200/10 dark:bg-purple-600/5 rounded-full blur-3xl animate-pulse delay-500"></div>
             </div>
+
+            {/* Floating Icons */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <motion.div
+                animate={{
+                  y: [0, -20, 0],
+                  rotate: [0, 5, 0],
+                }}
+                transition={{
+                  duration: 6,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                className="absolute top-20 left-20 text-blue-400/30 dark:text-blue-500/20">
+                <ChartBarIcon className="w-8 h-8" />
+              </motion.div>
+              <motion.div
+                animate={{
+                  y: [0, 15, 0],
+                  rotate: [0, -5, 0],
+                }}
+                transition={{
+                  duration: 8,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 1,
+                }}
+                className="absolute top-40 right-32 text-indigo-400/30 dark:text-indigo-500/20">
+                <EyeIcon className="w-6 h-6" />
+              </motion.div>
+              <motion.div
+                animate={{
+                  y: [0, -25, 0],
+                  x: [0, 10, 0],
+                }}
+                transition={{
+                  duration: 10,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 2,
+                }}
+                className="absolute bottom-32 left-32 text-purple-400/30 dark:text-purple-500/20">
+                <CursorArrowRaysIcon className="w-7 h-7" />
+              </motion.div>
+              <motion.div
+                animate={{
+                  y: [0, 20, 0],
+                  rotate: [0, 10, 0],
+                }}
+                transition={{
+                  duration: 7,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 0.5,
+                }}
+                className="absolute bottom-20 right-20 text-blue-400/30 dark:text-blue-500/20">
+                <UsersIcon className="w-6 h-6" />
+              </motion.div>
+            </div>
+
+            {/* Main Content */}
+            <motion.div
+              initial={{ opacity: 0, y: 40, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{
+                duration: 0.8,
+                ease: "easeOut",
+                type: "spring",
+                stiffness: 100,
+              }}
+              className="relative z-10 text-center max-w-4xl mx-auto p-8">
+              {/* Glass Card Container */}
+              <div className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/30 p-10 relative overflow-hidden">
+                {/* Subtle gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-indigo-500/5 dark:from-blue-400/10 dark:to-indigo-400/10 rounded-3xl"></div>
+
+                {/* Content */}
+                <div className="relative z-10">
+                  {/* Title */}
+                  <motion.h2
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.5 }}
+                    className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 dark:from-white dark:via-gray-100 dark:to-white bg-clip-text text-transparent mb-3">
+                    Authentication Required
+                  </motion.h2>
+
+                  {/* Subtitle */}
+                  <motion.p
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.6 }}
+                    className="text-gray-600 dark:text-gray-300 text-lg mb-8 leading-relaxed">
+                    Connect your Meta Business account to unlock powerful
+                    analytics and insights for your campaigns.
+                  </motion.p>
+
+                  {/* Features List */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.8, delay: 0.7 }}
+                    className="grid grid-cols-1 gap-4 mb-8">
+                    <div className="flex items-center space-x-3 p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-xl border border-blue-100/50 dark:border-blue-800/30">
+                      <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-400/10 rounded-lg flex items-center justify-center">
+                        <ChartBarIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Real-time Campaign Analytics
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-3 p-3 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100/50 dark:border-indigo-800/30">
+                      <div className="w-8 h-8 bg-indigo-500/10 dark:bg-indigo-400/10 rounded-lg flex items-center justify-center">
+                        <EyeIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Performance Insights & Metrics
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-3 p-3 bg-purple-50/50 dark:bg-purple-900/20 rounded-xl border border-purple-100/50 dark:border-purple-800/30">
+                      <div className="w-8 h-8 bg-purple-500/10 dark:bg-purple-400/10 rounded-lg flex items-center justify-center">
+                        <SparklesIcon className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        AI-Powered Recommendations
+                      </span>
+                    </div>
+                  </motion.div>
+
+                  {/* CTA Button */}
+                  <motion.button
+                    initial={{ opacity: 0, y: 30, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.8, delay: 0.9 }}
+                    whileHover={{
+                      scale: 1.05,
+                      boxShadow:
+                        "0 20px 25px -5px rgba(99, 102, 241, 0.3), 0 10px 10px -5px rgba(99, 102, 241, 0.1)",
+                    }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => router("/meta-campaign")}
+                    className="group relative w-full px-8 py-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-semibold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden">
+                    {/* Button shimmer effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
+
+                    {/* Button content */}
+                    <div className="relative flex items-center justify-center space-x-3">
+                      <svg
+                        className="w-5 h-5"
+                        viewBox="0 0 24 24"
+                        fill="currentColor">
+                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                      </svg>
+                      <span className="text-lg">Connect Meta Account</span>
+                      <motion.div
+                        animate={{ x: [0, 4, 0] }}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                          ease: "easeInOut",
+                        }}
+                        className="ml-1">
+                        →
+                      </motion.div>
+                    </div>
+                  </motion.button>
+
+                  {/* Security Notice */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.6, delay: 1.1 }}
+                    className="mt-6 p-4 bg-gray-50/50 dark:bg-gray-700/30 rounded-xl border border-gray-200/50 dark:border-gray-600/30">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0">
+                        <svg
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                          />
+                        </svg>
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Secure & Private
+                        </p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                          We only access your campaign performance data. Your
+                          ads and settings remain completely under your control.
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Decorative elements */}
+            <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
           </div>
-        )}
+        </>
+      )}
+      <div className="relative">
         <motion.div
           initial="hidden"
           animate="visible"

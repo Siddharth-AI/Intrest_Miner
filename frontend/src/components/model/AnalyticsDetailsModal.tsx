@@ -25,22 +25,28 @@ import {
   InformationCircleIcon,
   TrophyIcon,
   FireIcon,
+  StarIcon,
+  ShieldCheckIcon,
+  MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
 import Portal from "../ui/Portal";
+import { Delete, DeleteIcon } from "lucide-react";
 
 interface CampaignDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   campaign: any;
+  category: string;
 }
 
 const AnalyticsDetailsModal: React.FC<CampaignDetailsModalProps> = ({
   isOpen,
   onClose,
   campaign,
+  category,
 }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
-
+  console.log(category, "category=>>>>>>>>>>>>>>>>>>>>>>>");
   // Theme detection
   useEffect(() => {
     const checkTheme = () => {
@@ -125,7 +131,26 @@ const AnalyticsDetailsModal: React.FC<CampaignDetailsModalProps> = ({
     }
   };
 
+  // 🔥 ENHANCED: Updated category icon function for new categories
   const getCategoryIcon = (category: string) => {
+    // Handle new verdict categories
+    if (category?.includes("champion") || category?.includes("superstar")) {
+      return <TrophyIcon className="h-5 w-5 text-yellow-600" />;
+    }
+    if (category?.includes("magnet") || category?.includes("stellar")) {
+      return <MagnifyingGlassIcon className="h-5 w-5 text-purple-600" />;
+    }
+    if (category?.includes("solid") || category?.includes("steady")) {
+      return <ShieldCheckIcon className="h-5 w-5 text-blue-600" />;
+    }
+    if (category?.includes("building") || category?.includes("developing")) {
+      return <SparklesIcon className="h-5 w-5 text-green-600" />;
+    }
+    if (category?.includes("struggling") || category?.includes("weak")) {
+      return <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />;
+    }
+
+    // Original categories
     switch (category) {
       case "sales/conversion":
         return <TrophyIcon className="h-5 w-5 text-green-600" />;
@@ -140,7 +165,39 @@ const AnalyticsDetailsModal: React.FC<CampaignDetailsModalProps> = ({
     }
   };
 
+  // 🔥 ENHANCED: Updated category color function for new categories
   const getCategoryColor = (category: string) => {
+    // Handle new verdict categories with color coding
+    if (
+      category?.includes("champion") ||
+      category?.includes("superstar") ||
+      category?.includes("magnet")
+    ) {
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800";
+    }
+    if (
+      category?.includes("solid") ||
+      category?.includes("steady") ||
+      category?.includes("performer")
+    ) {
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800";
+    }
+    if (
+      category?.includes("building") ||
+      category?.includes("developing") ||
+      category?.includes("emerging")
+    ) {
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800";
+    }
+    if (
+      category?.includes("struggling") ||
+      category?.includes("weak") ||
+      category?.includes("underperforming")
+    ) {
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-800";
+    }
+
+    // Original categories
     switch (category) {
       case "sales/conversion":
         return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800";
@@ -157,6 +214,7 @@ const AnalyticsDetailsModal: React.FC<CampaignDetailsModalProps> = ({
 
   if (!isOpen || !campaign) return null;
 
+  // 🔥 ENHANCED: Added leads and score to performance metrics
   const performanceMetrics = [
     {
       title: "Impressions",
@@ -214,8 +272,22 @@ const AnalyticsDetailsModal: React.FC<CampaignDetailsModalProps> = ({
       bgColor: "bg-cyan-50 dark:bg-cyan-900/20",
       borderColor: "border-cyan-200 dark:border-cyan-800",
     },
+    // 🔥 NEW: Add performance score if available
+    ...(campaign.score
+      ? [
+          {
+            title: "Performance Score",
+            value: campaign.score.toFixed(1),
+            icon: StarIcon,
+            color: "text-yellow-600 dark:text-yellow-400",
+            bgColor: "bg-yellow-50 dark:bg-yellow-900/20",
+            borderColor: "border-yellow-200 dark:border-yellow-800",
+          },
+        ]
+      : []),
   ];
 
+  // 🔥 ENHANCED: Added leads to conversion metrics
   const conversionMetrics = [
     {
       title: "Add to Cart",
@@ -244,6 +316,15 @@ const AnalyticsDetailsModal: React.FC<CampaignDetailsModalProps> = ({
       icon: CreditCardIcon,
       color: "text-purple-600",
       bgColor: "bg-purple-500",
+    },
+    // 🔥 NEW: Add leads conversion metric
+    {
+      title: "Leads",
+      value:
+        campaign.totals?.actions?.lead || campaign.totals?.total_leads || 0,
+      icon: StarIcon,
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-500",
     },
   ];
 
@@ -325,7 +406,9 @@ const AnalyticsDetailsModal: React.FC<CampaignDetailsModalProps> = ({
                           )}`}>
                           {getCategoryIcon(campaign.verdict.category)}
                           <span className="ml-2 capitalize">
-                            {campaign.verdict.category.replace("/", " & ")}
+                            {campaign.verdict.category
+                              .replace("/", " & ")
+                              .replace("_", " ")}
                           </span>
                         </span>
                       )}
@@ -341,6 +424,43 @@ const AnalyticsDetailsModal: React.FC<CampaignDetailsModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* 🔥 NEW: Lead Performance Highlight (if applicable) */}
+              {(campaign.totals?.actions?.lead ||
+                campaign.totals?.total_leads) && (
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-700 rounded-2xl p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
+                        <StarIcon className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-bold text-green-900 dark:text-green-100">
+                          Lead Generation Performance
+                        </h4>
+                        <p className="text-green-700 dark:text-green-300 text-sm">
+                          Total leads generated and cost efficiency
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right space-y-1">
+                      <div className="text-3xl font-bold text-green-900 dark:text-green-100">
+                        {campaign.totals?.actions?.lead ||
+                          campaign.totals?.total_leads ||
+                          0}
+                      </div>
+                      <div className="text-sm text-green-700 dark:text-green-300">
+                        {campaign.totals?.average_lead_cost && (
+                          <>
+                            Avg:{" "}
+                            {formatCurrency(campaign.totals.average_lead_cost)}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Performance Metrics Grid */}
               <div>
@@ -380,7 +500,7 @@ const AnalyticsDetailsModal: React.FC<CampaignDetailsModalProps> = ({
                   <BanknotesIcon className="mr-2 text-green-600 h-5 w-5" />
                   Conversion Actions
                 </h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   {conversionMetrics.map((metric, index) => (
                     <motion.div
                       key={metric.title}
@@ -480,6 +600,72 @@ const AnalyticsDetailsModal: React.FC<CampaignDetailsModalProps> = ({
                           </p>
                         </div>
                       </div>
+                    </div>
+                    {category === "underperforming" && (
+                      <div className="bg-green-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6">
+                        <div className="flex items-start space-x-3">
+                          <div className="p-2 bg-red-500 rounded-lg">
+                            <Delete className="h-5 w-5 text-white" />
+                          </div>
+                          <div>
+                            <h5 className="font-semibold text-red-900 dark:text-red-100 mb-2">
+                              Recommended Action
+                            </h5>
+                            <p className="text-red-800 dark:text-red-200 text-sm leading-relaxed">
+                              🗑️ End this campaign or completely rework
+                              strategy.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 🔥 NEW: Additional Lead Information (if available) */}
+              {(campaign.totals?.total_lead_value ||
+                campaign.totals?.average_lead_cost) && (
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                    <StarIcon className="mr-2 text-yellow-600 h-5 w-5" />
+                    Lead Generation Insights
+                  </h4>
+                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {campaign.totals?.total_lead_value && (
+                        <div className="space-y-2">
+                          <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                            Total Lead Value
+                          </div>
+                          <div className="text-lg text-gray-900 dark:text-white font-semibold">
+                            {formatCurrency(campaign.totals.total_lead_value)}
+                          </div>
+                        </div>
+                      )}
+                      {campaign.totals?.average_lead_cost && (
+                        <div className="space-y-2">
+                          <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                            Average Lead Cost
+                          </div>
+                          <div className="text-lg text-gray-900 dark:text-white font-semibold">
+                            {formatCurrency(campaign.totals.average_lead_cost)}
+                          </div>
+                        </div>
+                      )}
+                      {(campaign.totals?.actions?.lead ||
+                        campaign.totals?.total_leads) && (
+                        <div className="space-y-2">
+                          <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                            Total Leads
+                          </div>
+                          <div className="text-lg text-gray-900 dark:text-white font-semibold">
+                            {campaign.totals?.actions?.lead ||
+                              campaign.totals?.total_leads ||
+                              0}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

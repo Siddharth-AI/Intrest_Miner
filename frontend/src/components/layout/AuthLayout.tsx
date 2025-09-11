@@ -42,7 +42,7 @@ export default function AuthLayout() {
           className={`transition-all duration-300 ${
             sidebarCollapsed ? "sm:ml-20" : "sm:ml-80"
           } pt-16`}>
-          <div className="p-6 dark:bg-gray-900">
+          <div className="dark:bg-gray-900">
             <Outlet />
           </div>
           <Footer />

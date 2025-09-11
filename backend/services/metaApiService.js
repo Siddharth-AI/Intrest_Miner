@@ -15,6 +15,7 @@ async function getAdAccounts(token) {
     throw err;
   }
 }
+
 // Get Campaigns with optional filters (status, objective)
 async function getCampaigns(adAccountId, token, filters = {}) {
   try {
@@ -23,7 +24,6 @@ async function getCampaigns(adAccountId, token, filters = {}) {
       fields: "id,name,objective,status,start_time,stop_time,daily_budget,lifetime_budget,source_campaign_id",
       ...filters // <-- dynamic filters from controller
     };
-
     const res = await axios.get(`https://graph.facebook.com/v19.0/${adAccountId}/campaigns`, { params });
     return res.data.data;
   } catch (err) {
@@ -32,6 +32,7 @@ async function getCampaigns(adAccountId, token, filters = {}) {
   }
 }
 
+// Get Campaign Insights
 async function getCampaignInsights(campaignId, token, filters = {}) {
   const params = {
     access_token: token,
@@ -44,4 +45,5 @@ async function getCampaignInsights(campaignId, token, filters = {}) {
   const res = await axios.get(`https://graph.facebook.com/v19.0/${campaignId}/insights`, { params });
   return res.data.data;
 }
+
 module.exports = { getAdAccounts, getCampaigns, getCampaignInsights };

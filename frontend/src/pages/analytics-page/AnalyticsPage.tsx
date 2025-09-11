@@ -414,18 +414,18 @@ const AnalyticsPage: React.FC = () => {
   }, []);
 
   // All your existing loading and error states (unchanged)
-  if (initialLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">
-            Loading analytics data...
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // if (initialLoading) {
+  //   return (
+  //     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+  //       <div className="text-center">
+  //         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+  //         <p className="text-gray-600 dark:text-gray-400">
+  //           Loading analytics data...
+  //         </p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   if (!hasToken) {
     return (
@@ -666,16 +666,6 @@ const AnalyticsPage: React.FC = () => {
                     Loading insights...
                   </div>
                 )}
-                {selectedAccount &&
-                  insightsLastUpdated[selectedAccount] &&
-                  !loadingTotals && (
-                    <div className="text-xs bg-white/20 px-2 py-1 rounded-full text-indigo-100">
-                      Updated:{" "}
-                      {new Date(
-                        insightsLastUpdated[selectedAccount]
-                      ).toLocaleTimeString()}
-                    </div>
-                  )}
               </div>
             </div>
             <div className="flex items-center space-x-4">

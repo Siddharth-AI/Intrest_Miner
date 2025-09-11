@@ -1,7 +1,6 @@
 const { adjustDateRange, classifyCampaign, getTokenFromHeader } = require("../utils/helper");
 const { getCampaigns, getCampaignInsights } = require("../services/metaApiService");
-const { calculateTotals, recommendCampaign } = require("../utils/calculateKpi");
-
+const { calculateTotals, recommendCampaign, getPerformanceCategory } = require("../utils/calculateKpi");
 
 const insightsReport = async (req, res) => {
   try {
@@ -23,8 +22,9 @@ const insightsReport = async (req, res) => {
         const { since, until } = adjustDateRange(date_start, date_stop, campaign);
         filters.time_range = JSON.stringify({ since, until });
       } else {
-        filters.date_preset = "maximum"; // fallback
+        filters.date_preset = "maximum";
       }
+
       const insights = await getCampaignInsights(campaignId, token, filters);
       const totals = calculateTotals(insights);
 
@@ -43,7 +43,17 @@ const insightsReport = async (req, res) => {
         ctr: 0,
         cpc: 0,
         cpp: 0,
-        actions: { add_to_cart: 0, purchase: 0, initiate_checkout: 0, add_payment_info: 0 }
+        actions: {
+          add_to_cart: 0,
+          purchase: 0,
+          initiate_checkout: 0,
+          add_payment_info: 0,
+          lead: 0
+        },
+        cost_per_action_type: {},
+        total_leads: 0,
+        total_lead_value: 0,
+        average_lead_cost: 0
       };
 
       for (let campaign of campaigns) {
@@ -61,7 +71,7 @@ const insightsReport = async (req, res) => {
         const insights = await getCampaignInsights(campaign.id, token, filters);
         const totals = calculateTotals(insights);
 
-        // 🔮 classify each campaign
+        // 🔮 classify each campaign with human-like analysis
         const verdict = classifyCampaign(campaign, totals);
 
         campaignAnalysis.push({ ...campaign, totals, verdict });
@@ -71,22 +81,70 @@ const insightsReport = async (req, res) => {
         overallTotals.clicks += totals.clicks;
         overallTotals.reach += totals.reach;
         overallTotals.spend += totals.spend;
+
+        // Accumulate leads
+        overallTotals.total_leads += totals.total_leads;
+        overallTotals.total_lead_value += totals.total_lead_value;
+
         for (let key in totals.actions) {
           overallTotals.actions[key] = (overallTotals.actions[key] || 0) + totals.actions[key];
         }
+
+        // Accumulate cost per action types
+        for (let actionType in totals.cost_per_action_type) {
+          if (!overallTotals.cost_per_action_type[actionType]) {
+            overallTotals.cost_per_action_type[actionType] = totals.cost_per_action_type[actionType];
+          } else {
+            overallTotals.cost_per_action_type[actionType] += totals.cost_per_action_type[actionType];
+          }
+        }
       }
 
+      // Calculate overall derived metrics
       overallTotals.ctr = overallTotals.clicks && overallTotals.impressions
         ? (overallTotals.clicks / overallTotals.impressions) * 100
         : 0;
       overallTotals.cpc = overallTotals.clicks ? overallTotals.spend / overallTotals.clicks : 0;
       overallTotals.cpp = overallTotals.actions.purchase ? overallTotals.spend / overallTotals.actions.purchase : 0;
 
-      const topCampaign = recommendCampaign(campaignAnalysis);
-      const stableCampaigns = campaignAnalysis.filter(c => c.totals.ctr > 1 && c.totals.cpc < 5);
-      const underperforming = campaignAnalysis.filter(c => !stableCampaigns.includes(c));
+      // Calculate overall lead metrics
+      if (overallTotals.total_leads > 0) {
+        overallTotals.average_lead_cost = overallTotals.total_lead_value / overallTotals.total_leads;
+      }
 
-      return res.json({ mode, overallTotals, campaignAnalysis, topCampaign, stableCampaigns, underperforming });
+      // 🎯 NEW IMPROVED CATEGORIZATION
+      const excellentCampaigns = campaignAnalysis.filter(c => {
+        const category = getPerformanceCategory(c, c.totals);
+        return category === 'excellent';
+      });
+
+      const stableCampaigns = campaignAnalysis.filter(c => {
+        const category = getPerformanceCategory(c, c.totals);
+        return category === 'stable';
+      });
+
+      const moderateCampaigns = campaignAnalysis.filter(c => {
+        const category = getPerformanceCategory(c, c.totals);
+        return category === 'moderate';
+      });
+
+      const underperforming = campaignAnalysis.filter(c => {
+        const category = getPerformanceCategory(c, c.totals);
+        return category === 'underperforming';
+      });
+
+      const topCampaign = recommendCampaign(campaignAnalysis);
+
+      return res.json({
+        mode,
+        overallTotals,
+        campaignAnalysis,
+        topCampaign,
+        excellentCampaigns,
+        stableCampaigns,
+        moderateCampaigns,
+        underperforming
+      });
     }
 
     // invalid mode

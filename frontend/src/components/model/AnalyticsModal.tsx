@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/components/model/AnalyticsModal.tsx
 import React, { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -30,6 +29,8 @@ import {
   ChevronRightIcon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
+  TrophyIcon,
+  StarIcon,
 } from "@heroicons/react/24/outline";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import { setShowAnalyticsModal } from "../../../store/features/facebookAdsSlice";
@@ -56,9 +57,12 @@ const AnalyticsModal: React.FC = () => {
     showAnalyticsModal,
     overallTotals,
     campaignAnalysis,
-    topCampaign,
+    // 🔥 NEW: Added new campaign categories from your API
+    excellentCampaigns,
     stableCampaigns,
+    moderateCampaigns,
     underperforming,
+    topCampaign,
     loadingTotals,
   } = useAppSelector((state) => state.facebookAds);
 
@@ -165,7 +169,7 @@ const AnalyticsModal: React.FC = () => {
     }
   };
 
-  // Handle both single object and array cases
+  // 🔥 NEW: Get campaign data based on selected category
   const getCategoryData = () => {
     switch (selectedCategory) {
       case "top":
@@ -176,8 +180,12 @@ const AnalyticsModal: React.FC = () => {
         } else {
           return [];
         }
+      case "excellent":
+        return Array.isArray(excellentCampaigns) ? excellentCampaigns : [];
       case "stable":
         return Array.isArray(stableCampaigns) ? stableCampaigns : [];
+      case "moderate":
+        return Array.isArray(moderateCampaigns) ? moderateCampaigns : [];
       case "underperforming":
         return Array.isArray(underperforming) ? underperforming : [];
       default:
@@ -230,7 +238,9 @@ const AnalyticsModal: React.FC = () => {
     dateRangeStart,
     dateRangeEnd,
     topCampaign,
+    excellentCampaigns,
     stableCampaigns,
+    moderateCampaigns,
     underperforming,
     campaignAnalysis,
   ]);
@@ -309,7 +319,7 @@ const AnalyticsModal: React.FC = () => {
     return pages;
   };
 
-  // Overall stats cards
+  // Overall stats cards with your existing animation
   const statsCards = useMemo(() => {
     if (!overallTotals) return [];
 
@@ -355,17 +365,17 @@ const AnalyticsModal: React.FC = () => {
         textColor: "text-indigo-600 dark:text-indigo-400",
       },
       {
-        title: "Average CPC",
-        value: formatCurrency(overallTotals.cpc || 0),
-        icon: CurrencyRupeeIcon,
-        color: "from-pink-500 to-pink-600",
-        bgColor: "bg-pink-50 dark:bg-pink-900/20",
-        textColor: "text-pink-600 dark:text-pink-400",
+        title: "Total Leads",
+        value: overallTotals.total_leads?.toString() || "0",
+        icon: StarIcon,
+        color: "from-green-500 to-green-600",
+        bgColor: "bg-green-50 dark:bg-green-900/20",
+        textColor: "text-green-600 dark:text-green-400",
       },
     ];
   }, [overallTotals]);
 
-  // Action stats
+  // Action stats with your existing styling
   const actionStats = useMemo(() => {
     if (!overallTotals?.actions) return [];
 
@@ -394,10 +404,16 @@ const AnalyticsModal: React.FC = () => {
         icon: CreditCardIcon,
         color: "bg-purple-500",
       },
+      {
+        title: "Leads",
+        value: overallTotals.actions.lead || 0,
+        icon: StarIcon,
+        color: "bg-yellow-500",
+      },
     ];
   }, [overallTotals]);
 
-  // Categories with proper counts
+  // 🔥 NEW: Categories with proper counts
   const categories = [
     {
       id: "all",
@@ -406,23 +422,27 @@ const AnalyticsModal: React.FC = () => {
       color: "text-gray-600 dark:text-gray-400",
       count: Array.isArray(campaignAnalysis) ? campaignAnalysis.length : 0,
     },
+
     {
-      id: "top",
-      name: "Top Campaigns",
+      id: "excellent",
+      name: "Excellent",
       icon: FireIcon,
-      color: "text-orange-600 dark:text-orange-400",
-      count: Array.isArray(topCampaign)
-        ? topCampaign.length
-        : topCampaign && typeof topCampaign === "object"
-        ? 1
-        : 0,
+      color: "text-green-600 dark:text-green-400",
+      count: Array.isArray(excellentCampaigns) ? excellentCampaigns.length : 0,
     },
     {
       id: "stable",
-      name: "Stable Campaigns",
+      name: "Stable",
       icon: ShieldCheckIcon,
-      color: "text-green-600 dark:text-green-400",
+      color: "text-blue-600 dark:text-blue-400",
       count: Array.isArray(stableCampaigns) ? stableCampaigns.length : 0,
+    },
+    {
+      id: "moderate",
+      name: "Moderate",
+      icon: SparklesIcon,
+      color: "text-yellow-600 dark:text-yellow-400",
+      count: Array.isArray(moderateCampaigns) ? moderateCampaigns.length : 0,
     },
     {
       id: "underperforming",
@@ -434,18 +454,32 @@ const AnalyticsModal: React.FC = () => {
   ];
 
   const getCategoryBadgeColor = (category: string) => {
-    switch (category) {
-      case "sales/conversion":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
-      case "traffic/awareness":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
-      case "engagement":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
-      case "underperforming":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
+    // 🔥 NEW: Handle new verdict categories
+    if (
+      category?.includes("champion") ||
+      category?.includes("magnet") ||
+      category?.includes("superstar")
+    ) {
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
     }
+    if (
+      category?.includes("solid") ||
+      category?.includes("steady") ||
+      category?.includes("performer")
+    ) {
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    }
+    if (
+      category?.includes("building") ||
+      category?.includes("developing") ||
+      category?.includes("emerging")
+    ) {
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+    }
+    if (category?.includes("struggling") || category?.includes("weak")) {
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+    }
+    return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
   };
 
   if (!showAnalyticsModal) return null;
@@ -558,7 +592,7 @@ const AnalyticsModal: React.FC = () => {
                           <BanknotesIcon className="mr-2 text-green-600 h-5 w-5" />
                           Conversion Actions
                         </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                           {actionStats.map((stat, index) => (
                             <motion.div
                               key={stat.title}
@@ -582,13 +616,15 @@ const AnalyticsModal: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Categories */}
+                    {/* 🔥 NEW: Top Campaign Highlight */}
+
+                    {/* 🔥 NEW: Categories with your existing styling */}
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                         <FunnelIcon className="mr-2 text-purple-600 h-5 w-5" />
                         Campaign Categories
                       </h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
                         {categories.map((category) => (
                           <button
                             key={category.id}
@@ -611,7 +647,7 @@ const AnalyticsModal: React.FC = () => {
                         ))}
                       </div>
 
-                      {/* Filters */}
+                      {/* Filters - using your existing grid layout */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
                         {/* Search */}
                         <div className="relative">
@@ -642,10 +678,10 @@ const AnalyticsModal: React.FC = () => {
                           onChange={(e) => setObjectiveFilter(e.target.value)}
                           className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
                           <option value="all">All Objectives</option>
-                          <option value="outcome_sales">Sales</option>
-                          <option value="outcome_traffic">Traffic</option>
-                          <option value="outcome_engagement">Engagement</option>
+                          <option value="outcome_leads">Leads</option>
                           <option value="outcome_awareness">Awareness</option>
+                          <option value="outcome_engagement">Engagement</option>
+                          <option value="outcome_sales">Sales</option>
                         </select>
 
                         {/* Date Range */}
@@ -819,6 +855,12 @@ const AnalyticsModal: React.FC = () => {
                                           {campaign.totals?.actions
                                             ?.add_to_cart || 0}
                                         </div>
+                                        <div className="text-yellow-600">
+                                          Lead:{" "}
+                                          {campaign.totals?.actions?.lead ||
+                                            campaign.totals?.total_leads ||
+                                            0}
+                                        </div>
                                       </div>
                                     </td>
 
@@ -913,7 +955,7 @@ const AnalyticsModal: React.FC = () => {
                             {/* Page Numbers */}
                             <div className="flex items-center space-x-1">
                               {getPageNumbers().map((page, index) => (
-                                <React.Fragment key={index}>
+                                <div key={index}>
                                   {page === "..." ? (
                                     <span className="px-3 py-2 text-gray-500">
                                       ...
@@ -931,7 +973,7 @@ const AnalyticsModal: React.FC = () => {
                                       {page}
                                     </button>
                                   )}
-                                </React.Fragment>
+                                </div>
                               ))}
                             </div>
 
@@ -981,6 +1023,7 @@ const AnalyticsModal: React.FC = () => {
         isOpen={showCampaignDetails}
         onClose={handleCloseCampaignDetails}
         campaign={selectedCampaign}
+        category={selectedCategory}
       />
     </>
   );

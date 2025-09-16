@@ -21,6 +21,11 @@ const userSchema = `CREATE TABLE IF NOT EXISTS users (
   updated_by varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   is_active tinyint(1) NOT NULL DEFAULT '1',
   is_deleted tinyint(1) NOT NULL DEFAULT '0',
+  fb_user_id varchar(50) DEFAULT NULL UNIQUE,
+  fb_access_token text DEFAULT NULL,
+  fb_token_updated_at timestamp NULL DEFAULT NULL,
+  fb_token_expires_in int DEFAULT NULL,
+  INDEX idx_fb_user_id (fb_user_id);
   INDEX idx_uuid (uuid),
   INDEX idx_email (email),
   INDEX idx_otp_code (otp_code),

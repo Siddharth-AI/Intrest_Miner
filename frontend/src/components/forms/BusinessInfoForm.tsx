@@ -200,6 +200,7 @@ const BusinessInfoForm = ({ onSubmit, isLoading }: BusinessInfoFormProps) => {
           id="productDescription"
           placeholder="Describe your product or service in detail..."
           value={formData.productDescription}
+          minLength={20}
           onChange={(e) =>
             handleInputChange("productDescription", e.target.value)
           }

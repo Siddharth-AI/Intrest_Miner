@@ -649,13 +649,13 @@ const Dashboard: React.FC = () => {
     [adAccounts.length, campaigns, campaignInsightstotal.length]
   );
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  // const formatCurrency = (amount: number) =>
+  //   new Intl.NumberFormat("en-IN", {
+  //     style: "currency",
+  //     currency: "INR",
+  //     minimumFractionDigits: 0,
+  //     maximumFractionDigits: 0,
+  //   }).format(amount);
 
   // Enhanced theme configuration
   const themeConfig = useMemo(

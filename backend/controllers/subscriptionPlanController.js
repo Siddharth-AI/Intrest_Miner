@@ -1,14 +1,10 @@
 const { v4: uuidv4 } = require("uuid");
-const { createTable, insertRecord, selectRecord, updateRecord, softDeleteRecord, checkRecordExists } = require("../utils/sqlFunctions");
+const { insertRecord, selectRecord, updateRecord, softDeleteRecord, checkRecordExists } = require("../utils/sqlFunctions");
 const { customResponse } = require("../utils/customResponse");
-const subscriptionPlanSchema = require("../schema/subscriptionPlanSchema");
 
 // Initialize default plans
 const initializeDefaultPlans = async () => {
     try {
-        // Make sure the table exists first
-        await createTable(subscriptionPlanSchema);
-
         const defaultPlans = [
             {
                 uuid: uuidv4(),
@@ -60,7 +56,7 @@ const getAllPlans = async (req, res) => {
         const { active_only = "true", popular_only = "false" } = req.query;
 
         let query = `
-      SELECT uuid, name, description, price, search_limit, duration_days, 
+      SELECT id, uuid, name, description, price, search_limit, duration_days, 
              features, is_active, is_popular, sort_order, created_at, updated_at
       FROM subscription_plans 
       WHERE is_deleted = 0

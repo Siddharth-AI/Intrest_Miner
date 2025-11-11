@@ -191,6 +191,19 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
   };
 
   const handleExportCSV = () => {
+    const selectedItems = interests.filter((interest) =>
+      selectedInterests.includes(interest.name)
+    );
+
+    if (selectedItems.length === 0) {
+      toast({
+        title: "No Selection",
+        description: "Please select at least one interest to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const csvHeaders = [
       "Rank",
       "Interest Name",
@@ -201,7 +214,7 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
       "Relevance Score",
       "Category",
     ];
-    const csvRows = interests.map((interest) => [
+    const csvRows = selectedItems.map((interest) => [
       interest.rank,
       interest.name,
       interest.audienceSizeLowerBound,
@@ -220,7 +233,7 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${businessData.productName}_meta_interests.csv`;
+    a.download = `${businessData.productName}_selected_interests.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -228,7 +241,7 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
 
     toast({
       title: "Export Successful",
-      description: "Your interest analysis has been downloaded as CSV.",
+      description: `${selectedItems.length} selected interests downloaded as CSV.`,
     });
   };
 
@@ -238,6 +251,17 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
         ? prev.filter((name) => name !== interestName)
         : [...prev, interestName]
     );
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const allNames = e.target.checked
+      ? interests.map((interest) => interest.name)
+      : [];
+    setSelectedInterests(allNames);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedInterests([]);
   };
 
   const totalAudience = interests.reduce(
@@ -424,13 +448,31 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                   {businessData.productName}
                 </CardDescription>
               </div>
-              <Button
-                onClick={handleExportCSV}
-                className="bg-green-600 hover:bg-green-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
-                disabled={interests.length === 0}>
-                <Download className="w-4 h-4 mr-2" />
-                Export CSV
-              </Button>
+              {interests.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm text-[#2d3748] dark:text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={
+                        selectedInterests.length === interests.length &&
+                        interests.length > 0
+                      }
+                      onChange={handleSelectAll}
+                      className="accent-[#3b82f6]"
+                    />
+                    Select All
+                  </label>
+                  {selectedInterests.length > 0 && (
+                    <Button
+                      onClick={handleClearSelection}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs">
+                      Clear ({selectedInterests.length})
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -545,7 +587,7 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                 <p className="text-[#111827] dark:text-white font-medium mb-2">
                   Selected Interests ({selectedInterests.length}):
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mb-4">
                   {selectedInterests.map((interest) => (
                     <Badge
                       key={interest}
@@ -554,23 +596,32 @@ const InterestResults = ({ businessData }: InterestResultsProps) => {
                     </Badge>
                   ))}
                 </div>
-                <Button
-                  className="mt-3 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
-                  onClick={() => {
-                    const selectedData = interests.filter((i) =>
-                      selectedInterests.includes(i.name)
-                    );
-                    console.log(
-                      "Selected interests for Meta Ad Manager:",
-                      selectedData
-                    );
-                    toast({
-                      title: "Interests Ready",
-                      description: `${selectedInterests.length} interests ready for Meta Ad Manager`,
-                    });
-                  }}>
-                  Add to Meta Campaign
-                </Button>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleExportCSV}
+                    className="bg-green-600 hover:bg-green-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                    disabled={selectedInterests.length === 0}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Export Selected CSV
+                  </Button>
+                  <Button
+                    className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                    onClick={() => {
+                      const selectedData = interests.filter((i) =>
+                        selectedInterests.includes(i.name)
+                      );
+                      console.log(
+                        "Selected interests for Meta Ad Manager:",
+                        selectedData
+                      );
+                      toast({
+                        title: "Interests Ready",
+                        description: `${selectedInterests.length} interests ready for Meta Ad Manager`,
+                      });
+                    }}>
+                    Add to Meta Campaign
+                  </Button>
+                </div>
               </motion.div>
             )}
           </CardContent>

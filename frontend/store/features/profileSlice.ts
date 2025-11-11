@@ -31,6 +31,9 @@ export interface UserProfileData {
   searches_remaining: number;
   total_searches_made: number;
   plan_details: PlanDetails;
+  fb_user_id?: string | null; // or Date if you parse it
+  fb_token_expires_in?: number | null;
+
 }
 
 interface ProfileState {
@@ -71,7 +74,6 @@ export const fetchProfileData = createAsyncThunk(
 
       const result = await response.json();
 
-      console.log(response);
 
       if (!response.ok) {
         return rejectWithValue(result.message || 'Failed to fetch profile data');
@@ -86,7 +88,7 @@ export const fetchProfileData = createAsyncThunk(
           result.data.plan_details.features = []; // Default to empty array on parse error
         }
       }
-
+      // console.log(result.data, "profile fetch data=>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
       return result.data;
     } catch (error: any) {
       return rejectWithValue(error.message || 'An unknown error occurred');

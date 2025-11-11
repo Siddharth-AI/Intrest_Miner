@@ -24,6 +24,7 @@ import aiSearchHistoryReducer from "./features/openAiSearchHistorySlice";
 import billingHistoryReducer from './features/billingHistorySlice';
 import razorpayReducer from './features/razorpaySlice';
 import facebookAdsReducer from './features/facebookAdsSlice';
+import onboardingReducer from './features/onboardingSlice';
 const persistConfig = {
   key: 'root',
   version: 1,
@@ -45,6 +46,7 @@ const rootReducer = combineReducers({
   billingHistory: billingHistoryReducer,
   razorpay: razorpayReducer,
   facebookAds: facebookAdsReducer,
+  onboarding: onboardingReducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

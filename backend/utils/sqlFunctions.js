@@ -1,24 +1,4 @@
-require("dotenv").config();
-
-const mysql = require("mysql2");
-
-// Validate required environment variables
-  console.log(process.env.DB_HOST," ",process.env.DB_USER," ",process.env.DB_PASSWORD)
-if (!process.env.DB_HOST || !process.env.DB_USER) {
-  console.error("❌ Missing required database environment variables!");
-  console.error(
-    "Please check your .env file contains: DB_HOST, DB_USER, DB_PASSWORD"
-  );
-  process.exit(1);
-}
-
-const pool = mysql.createPool({
-  connectionLimit: 10,
-  host: process.env.DB_HOST || "localhost",
-  user: process.env.DB_USER || "root",
-  password: process.env.DB_PASSWORD || "",
-  database: process.env.DB_NAME || "interest_miner"
-});
+const { pool } = require("../Config/Database");
 
 
 const createTable = (schema) => {
@@ -132,6 +112,65 @@ const softDeleteRecord = (tableName, column, value) => {
   });
 };
 
+// Add these functions to your dbHelpers.js file
+
+const getOnboardingStatus = (userId) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT has_seen_onboarding, has_seen_interest_miner_tutorial 
+      FROM users 
+      WHERE uuid = ? AND is_deleted = 0
+    `;
+
+    pool.query(query, [userId], (err, results) => {
+      if (err) {
+        console.error("Get onboarding status error:", err);
+        reject(err);
+      } else {
+        resolve(results.length ? results[0] : null);
+      }
+    });
+  });
+};
+
+const updateOnboardingStatus = (userId, hasSeenOnboarding, hasSeenInterestMinerTutorial, updatedBy) => {
+  return new Promise((resolve, reject) => {
+    const updates = [];
+    const params = [];
+
+    if (hasSeenOnboarding !== undefined) {
+      updates.push('has_seen_onboarding = ?');
+      params.push(hasSeenOnboarding ? 1 : 0);
+    }
+
+    if (hasSeenInterestMinerTutorial !== undefined) {
+      updates.push('has_seen_interest_miner_tutorial = ?');
+      params.push(hasSeenInterestMinerTutorial ? 1 : 0);
+    }
+
+    if (updates.length === 0) {
+      resolve({ message: 'No fields to update' });
+      return;
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    updates.push('updated_by = ?');
+    params.push(updatedBy);
+    params.push(userId);
+
+    const query = `UPDATE users SET ${updates.join(', ')} WHERE uuid = ? AND is_deleted = 0`;
+
+    pool.query(query, params, (err, results) => {
+      if (err) {
+        console.error("Update onboarding status error:", err);
+        reject(err);
+      } else {
+        resolve(results);
+      }
+    });
+  });
+};
+
 module.exports = {
   createTable,
   checkRecordExists,
@@ -140,5 +179,7 @@ module.exports = {
   selectRecord,
   deleteRecord,
   softDeleteRecord,
+  getOnboardingStatus,
+  updateOnboardingStatus
 
 };

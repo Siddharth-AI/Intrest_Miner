@@ -42,7 +42,7 @@ const RequireActivePlan = ({ children }: { children: JSX.Element }) => {
   if (error) {
     console.error("Failed to load user profile or profile is missing:", error);
     dispatch(openPricingModal());
-    navigate("/miner", { replace: true });
+    navigate("/dashboard", { replace: true });
     return null;
   }
 
@@ -65,7 +65,7 @@ const RequireActivePlan = ({ children }: { children: JSX.Element }) => {
       `ProtectedRoutes: Subscription status is '${subscriptionStatus}'. Redirecting to dashboard.`
     );
     dispatch(openPricingModal());
-    navigate("/miner", { replace: true });
+    navigate("/dashboard", { replace: true });
     return null;
   }
 };

@@ -3,17 +3,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import {
-  Facebook,
-  AlertCircle,
-  TrendingUp,
-  DollarSign,
-  Eye,
-  MousePointer,
-  RefreshCw,
-  Unlink,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { TrendingUp, Eye, MousePointer, RefreshCw } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -21,19 +11,27 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+// ADD: Import Redux hooks and actions
+import { useAppDispatch, useAppSelector } from "../../../store/hooks";
+import { fetchProfileData } from "../../../store/features/profileSlice";
+import { FaFacebook } from "react-icons/fa";
+import {
+  ArrowRightIcon,
+  ChartBarIcon,
+  ClockIcon,
+  HomeIcon,
+  LinkSlashIcon,
+} from "@heroicons/react/24/outline";
+import {
+  clearAllData,
+  // 🔥 NEW: Add Facebook auth imports
+  checkFacebookStatus,
+  initiateFacebookLogin,
+  unlinkFacebookAccount,
+} from "../../../store/features/facebookAdsSlice";
 
 interface MetaAccount {
   id: string;
@@ -59,6 +57,12 @@ interface Campaign {
 }
 
 const MetaCampaign: React.FC = () => {
+  const dispatch = useAppDispatch();
+  const router = useNavigate();
+  const { data: profileData, loading: profileLoading } = useAppSelector(
+    (state) => state.profile
+  );
+
   // Theme detection
   const [isDarkMode, setIsDarkMode] = useState(false);
   useEffect(() => {
@@ -75,281 +79,447 @@ const MetaCampaign: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  const [isConnected, setIsConnected] = useState(false);
+  const handleDisconnect = async () => {
+    console.log("🔗 Disconnecting Facebook...");
+    setIsConnecting(true);
+
+    try {
+      // Get the primary connection ID to disconnect
+      const primaryConnectionId = facebookAuth.primaryConnection?.id;
+
+      // Pass the connection ID to disconnect specific connection
+      await dispatch(unlinkFacebookAccount(primaryConnectionId)).unwrap();
+
+      toast({
+        title: "Facebook Disconnected",
+        description: "Your Facebook account has been disconnected successfully",
+      });
+
+      // Clear data and refresh
+      dispatch(clearAllData());
+      router("/dashboard");
+      console.log("✅ Facebook disconnected, user still logged into website");
+    } catch (error: any) {
+      console.error("❌ Facebook disconnect error:", error);
+      toast({
+        title: "Disconnect Failed",
+        description: `Failed to disconnect Facebook: ${error}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const { toast } = useToast();
 
-  // Facebook OAuth configuration
-  const FB_APP_ID = import.meta.env.VITE_FACEBOOK_APP_ID; // Your Facebook App ID
-  const REDIRECT_URI = window.location.origin + "/dashboard";
-  const SCOPES = "ads_management,ads_read,business_management";
-
-  // **SIMPLIFIED: Just check if token exists**
+  // NEW - Check both profile and Facebook status
   useEffect(() => {
-    const existingToken = localStorage.getItem("FB_ACCESS_TOKEN");
-    if (existingToken) {
-      console.log("✅ Found existing token, user is connected");
-      setIsConnected(true);
+    const authToken = localStorage.getItem("token");
+    if (authToken) {
+      dispatch(fetchProfileData());
+      // 🔥 NEW: Check Facebook status
+      dispatch(checkFacebookStatus());
     }
-  }, []);
+    setIsLoading(false);
+  }, [dispatch]);
 
+  // NEW - Use Facebook auth state
+  const { facebookAuth } = useAppSelector((state) => state.facebookAds);
+  const isConnected =
+    facebookAuth.isConnected && facebookAuth.status?.facebook_token_valid;
+
+  // NEW - Use Redux action
   const connectMetaAccount = async () => {
     console.log("🔗 Starting Facebook connection...");
     setIsConnecting(true);
 
     try {
-      const fbAuthUrl =
-        `https://www.facebook.com/v19.0/dialog/oauth?` +
-        `client_id=${FB_APP_ID}&` +
-        `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
-        `scope=${SCOPES}&` +
-        `response_type=token&` +
-        `state=dashboard`;
-
-      console.log("🌐 Redirecting to Facebook OAuth:", fbAuthUrl);
-      window.location.href = fbAuthUrl;
-    } catch (error) {
+      await dispatch(initiateFacebookLogin()).unwrap();
+      // Redirect happens in the action
+    } catch (error: any) {
       console.error("❌ Meta connection error:", error);
       toast({
         title: "Connection Failed",
-        description: "Failed to connect to Meta Business Account",
+        description: `Failed to connect to Meta Business Account: ${error}`,
         variant: "destructive",
       });
       setIsConnecting(false);
     }
   };
 
-  if (!isConnected) {
+  // Loading state for profile data
+  if (profileLoading || isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#f1f5f9] to-[rgba(124,58,237,0.11)] dark:from-gray-900 dark:to-gray-800 p-6">
-        <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Campaign Analytics
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mb-8">
-              Connect your Meta Business Account to unlock powerful campaign
-              insights and AI-powered optimization recommendations.
-            </p>
-          </motion.div>
-
-          <motion.div
-            className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.2 }}>
-            <div className="mx-auto w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center mb-6">
-              <svg
-                className="w-8 h-8 text-blue-600 dark:text-blue-400"
-                viewBox="0 0 24 24"
-                fill="currentColor">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-              </svg>
-            </div>
-
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              Campaign Analytics
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
-              Connect your Meta Business Account to unlock powerful campaign
-              insights and AI-powered optimization recommendations.
-            </p>
-
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Connect Your Meta Business Account
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-8">
-              Securely connect your Facebook and Instagram ad accounts to start
-              analyzing your campaign performance
-            </p>
-
-            <button
-              onClick={connectMetaAccount}
-              disabled={isConnecting}
-              className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              {isConnecting ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Connecting...
-                </>
-              ) : (
-                <>
-                  <Facebook className="w-5 h-5 mr-2" />
-                  Connect Meta Business Account
-                </>
-              )}
-            </button>
-
-            {/* Features */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
-              <motion.div
-                className="text-center"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.4 }}>
-                <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <svg
-                    className="w-6 h-6 text-blue-600 dark:text-blue-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                    />
-                  </svg>
-                </div>
-                <h4 className="font-medium text-gray-900 dark:text-white mb-2">
-                  Real-time Sync
-                </h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Auto-sync campaign data every 4 hours
-                </p>
-              </motion.div>
-
-              <motion.div
-                className="text-center"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.5 }}>
-                <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <svg
-                    className="w-6 h-6 text-blue-600 dark:text-blue-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                    />
-                  </svg>
-                </div>
-                <h4 className="font-medium text-gray-900 dark:text-white mb-2">
-                  Deep Insights
-                </h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  AI-powered performance analysis
-                </p>
-              </motion.div>
-
-              <motion.div
-                className="text-center"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.6 }}>
-                <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <svg
-                    className="w-6 h-6 text-blue-600 dark:text-blue-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                    />
-                  </svg>
-                </div>
-                <h4 className="font-medium text-gray-900 dark:text-white mb-2">
-                  Smart Recommendations
-                </h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Actionable optimization suggestions
-                </p>
-              </motion.div>
-            </div>
-
-            <motion.div
-              className="mt-8 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.8 }}>
-              <div className="flex items-center justify-center text-sm text-gray-600 dark:text-gray-400">
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                  />
-                </svg>
-                Your data is secure. We only access campaign performance metrics
-                and never modify your ads or settings without your explicit
-                permission.
-              </div>
-            </motion.div>
-          </motion.div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">
+            Loading Facebook connection status...
+          </p>
         </div>
       </div>
     );
   }
 
-  // Connected state - enhanced with animations, Card component, and professional UI
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-[#f1f5f9] to-[rgba(124,58,237,0.11)] dark:from-gray-900 dark:to-gray-800 p-6 flex items-center justify-center">
-      <motion.div
-        className="max-w-md w-full"
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}>
-        <Card className="bg-white dark:bg-gray-800 shadow-xl border-0 overflow-hidden">
-          <CardHeader className="text-center pt-8">
-            <motion.div
-              className="w-24 h-24 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-6"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.4, delay: 0.2 }}>
+  if (isConnected) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-100 dark:from-slate-900 dark:via-blue-950 dark:to-indigo-950 p-6 flex items-center justify-center relative overflow-hidden">
+        {/* Background decorations */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-300/20 dark:bg-blue-600/10 rounded-full blur-3xl animate-pulse"></div>
+          <div
+            className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-300/20 dark:bg-purple-600/10 rounded-full blur-3xl animate-pulse"
+            style={{ animationDelay: "1s" }}></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-200/10 dark:bg-indigo-600/5 rounded-full blur-3xl"></div>
+        </div>
+
+        <motion.div
+          className="max-w-5xl w-full relative z-10"
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}>
+          <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl shadow-2xl border-0 overflow-hidden relative">
+            {/* Success gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 via-blue-500/5 to-purple-500/5 dark:from-green-400/10 dark:via-blue-400/10 dark:to-purple-400/10"></div>
+
+            <CardHeader className="text-center pt-10 pb-6 relative">
+              {/* Animated success icon */}
               <motion.div
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ duration: 0.8, repeat: 1, ease: "easeInOut" }}>
-                <Facebook className="w-12 h-12 text-green-600 dark:text-green-400" />
+                className="relative mx-auto mb-6"
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{
+                  duration: 0.8,
+                  delay: 0.2,
+                  type: "spring",
+                  bounce: 0.4,
+                }}>
+                {/* Success circle with gradient */}
+                <div className="w-32 h-32 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center relative shadow-2xl">
+                  {/* Inner glow */}
+                  <div className="absolute inset-2 bg-white/20 rounded-full"></div>
+
+                  {/* Facebook logo */}
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.5, delay: 0.5 }}>
+                    <FaFacebook className="w-12 h-12 text-white relative z-10" />
+                  </motion.div>
+
+                  {/* Success checkmark overlay */}
+                  <motion.div
+                    className="absolute -bottom-2 -right-2 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shadow-lg border-4 border-white"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.4, delay: 0.8, type: "spring" }}>
+                    <svg
+                      className="w-5 h-5 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={3}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </motion.div>
+                </div>
+
+                {/* Animated rings */}
+                <motion.div
+                  className="absolute inset-0 border-4 border-green-300 rounded-full"
+                  animate={{ scale: [1, 1.3], opacity: [0.3, 0] }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeOut",
+                  }}
+                />
+                <motion.div
+                  className="absolute inset-0 border-4 border-blue-300 rounded-full"
+                  animate={{ scale: [1, 1.5], opacity: [0.3, 0] }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    delay: 0.5,
+                    ease: "easeOut",
+                  }}
+                />
               </motion.div>
-            </motion.div>
-            <CardTitle className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              🎉 Facebook Connected Successfully!
-            </CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-400 text-lg">
-              Your Facebook account is connected and data is synced. Redirecting
-              to analytics...
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center pb-8">
-            <Button
-              asChild
-              className="mt-4 px-6 py-3 text-base font-medium rounded-lg shadow-sm transition-all hover:shadow-md"
-              variant="default">
-              <Link to="/analytics">Go to Analytics Dashboard →</Link>
-            </Button>
-            <motion.p
-              className="mt-4 text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3, delay: 0.4 }}>
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              Syncing data in the background...
-            </motion.p>
-          </CardContent>
-        </Card>
-      </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.4 }}>
+                <CardTitle className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-purple-800 dark:from-white dark:via-blue-200 dark:to-purple-200 bg-clip-text text-transparent mb-3">
+                  🎉 Connection Successful!
+                </CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-300 text-lg leading-relaxed px-4">
+                  Your Facebook account is now connected and synchronized.
+                  <span className="font-semibold text-blue-600 dark:text-blue-400">
+                    {" "}
+                    Ready to unlock powerful insights!
+                  </span>
+                </CardDescription>
+              </motion.div>
+            </CardHeader>
+
+            <CardContent className="text-center pb-10 px-8">
+              {/* Connection details */}
+              <motion.div
+                className="grid grid-cols-3 gap-4 mb-8 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-slate-700/50 dark:to-slate-600/50 rounded-xl border border-blue-100 dark:border-slate-600"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.6 }}>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    ✓
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                    Authenticated
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    ⚡
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                    Data Synced
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                    🚀
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                    Ready to Go
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Action buttons */}
+              <motion.div
+                className=" flex items-center gap-2"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.8 }}>
+                {/* Primary CTA - Analytics Button */}
+
+                <Link
+                  to="/analytics"
+                  className="flex flex-1 items-center justify-center gap-2 py-3 px-4 text-base font-semibold rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-300 border-0 z-50">
+                  <ChartBarIcon className="w-5 h-5" />
+                  Launch Analytics
+                  <ArrowRightIcon className="w-4 h-4" />
+                </Link>
+
+                {/* Secondary actions in a row */}
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleDisconnect}
+                  disabled={isConnecting}
+                  className="flex py-3 px-4 rounded-xl border-2 flex-1 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200 items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed z-50">
+                  {isConnecting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500"></div>
+                      <span>Disconnecting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <LinkSlashIcon className="h-4 w-4" />
+                      <span>Disconnect</span>
+                    </>
+                  )}
+                </motion.button>
+              </motion.div>
+
+              {/* Sync status */}
+              <motion.div
+                className="mt-8 p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-xl border border-green-100 dark:border-green-800/30"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5, delay: 1 }}>
+                <div className="flex items-center justify-center gap-3 text-sm">
+                  <RefreshCw className="w-4 h-4 text-green-600 dark:text-green-400 animate-spin" />
+                  <span className="text-green-700 dark:text-green-300 font-medium">
+                    Real-time synchronization active
+                  </span>
+                </div>
+
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Your campaigns and insights are being updated automatically
+                </p>
+              </motion.div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-100 dark:from-slate-900 dark:via-blue-950 dark:to-indigo-950 p-6 relative overflow-hidden">
+      {/* Enhanced background decorations */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-300/10 dark:bg-blue-600/5 rounded-full blur-3xl animate-pulse"></div>
+        <div
+          className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-300/10 dark:bg-purple-600/5 rounded-full blur-3xl animate-pulse"
+          style={{ animationDelay: "2s" }}></div>
+        <div className="absolute top-1/3 right-1/4 w-64 h-64 bg-indigo-200/5 dark:bg-indigo-600/3 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="max-w-7xl mx-auto relative z-10">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="max-w-6xl mx-auto">
+          <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl shadow-2xl border-0 overflow-hidden relative">
+            {/* Gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-indigo-500/5 to-purple-500/5 dark:from-blue-400/10 dark:via-indigo-400/10 dark:to-purple-400/10"></div>
+
+            <CardContent className="text-center p-12 relative">
+              {/* Main Facebook icon */}
+              <motion.div
+                className="mx-auto w-24 h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mb-8 shadow-2xl"
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ duration: 0.8, type: "spring", bounce: 0.3 }}>
+                <FaFacebook className="w-12 h-12 text-white" />
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.3 }}>
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-purple-800 dark:from-white dark:via-blue-200 dark:to-purple-200 bg-clip-text text-transparent mb-4">
+                  Connect Your Meta Business Account
+                </h2>
+                <p className="text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto text-lg leading-relaxed">
+                  Securely connect your Meta Business Account to unlock
+                  insights, track performance, and boost results with AI-powered
+                  recommendations.
+                </p>
+
+                <motion.button
+                  onClick={connectMetaAccount}
+                  disabled={isConnecting}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="inline-flex items-center px-8 py-4 text-lg font-semibold rounded-xl shadow-lg bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white transition-all duration-300 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed border-0">
+                  {isConnecting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <FaFacebook className="w-6 h-6 mr-3" />
+                      Connect Meta Business Account
+                      <ArrowRightIcon className="w-5 h-5 ml-2" />
+                    </>
+                  )}
+                </motion.button>
+              </motion.div>
+
+              {/* Enhanced Features Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
+                <motion.div
+                  className="text-center group"
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.4 }}>
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                    <TrendingUp className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h4 className="font-bold text-lg text-gray-900 dark:text-white mb-3">
+                    Real-time Sync
+                  </h4>
+                  <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                    Auto-sync campaign data every 4 hours with intelligent
+                    caching for optimal performance
+                  </p>
+                </motion.div>
+
+                <motion.div
+                  className="text-center group"
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.5 }}>
+                  <div className="w-16 h-16 bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                    <Eye className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <h4 className="font-bold text-lg text-gray-900 dark:text-white mb-3">
+                    Deep Insights
+                  </h4>
+                  <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                    AI-powered performance analysis with actionable
+                    recommendations and trend predictions
+                  </p>
+                </motion.div>
+
+                <motion.div
+                  className="text-center group"
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.6 }}>
+                  <div className="w-16 h-16 bg-gradient-to-br from-emerald-100 to-green-100 dark:from-emerald-900/30 dark:to-green-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg">
+                    <MousePointer className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <h4 className="font-bold text-lg text-gray-900 dark:text-white mb-3">
+                    Smart Recommendations
+                  </h4>
+                  <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                    Intelligent optimization suggestions based on machine
+                    learning algorithms
+                  </p>
+                </motion.div>
+              </div>
+
+              {/* Security notice */}
+              <motion.div
+                className="mt-12 p-6 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-2xl border border-green-100 dark:border-green-800/30"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.8 }}>
+                <div className="flex items-center justify-center text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  <svg
+                    className="w-5 h-5 mr-3 text-green-600 dark:text-green-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                    />
+                  </svg>
+                  <span className="font-semibold text-green-700 dark:text-green-300">
+                    Enterprise-Grade Security
+                  </span>
+                </div>
+                <p className="text-center text-gray-600 dark:text-gray-400 leading-relaxed">
+                  Your data is protected with bank-level encryption. We only
+                  access campaign performance metrics and never modify your ads
+                  or settings without your explicit permission.
+                </p>
+              </motion.div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
     </div>
   );
 };

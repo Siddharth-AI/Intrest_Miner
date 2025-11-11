@@ -40,7 +40,7 @@ export const searchFacebookInterests = createAsyncThunk(
     if (!token) throw new Error("No authorization token found");
 
     const response = await axios.post(
-      `${import.meta.env.VITE_INTEREST_MINER_API_URL}/facebook/search`,
+      `${import.meta.env.VITE_INTEREST_MINER_API_URL}/api/facebook/search`,
       { query, limit },
       { headers: { Authorization: `Bearer ${token}` } }
     );

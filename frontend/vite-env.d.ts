@@ -8,7 +8,6 @@ interface ImportMetaEnv {
   readonly VITE_FB_APP_SECRET: string;
   readonly VITE_FACEBOOK_APP_ID: string;
   readonly VITE_RAZORPAY_REAL_KEY_ID: string;
-  readonly VITE_RAZORPAY_KEY_ID: string;
 }
 
 interface ImportMeta {

@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS payments (
     plan_id INT NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
     currency VARCHAR(3) DEFAULT 'USD',
-    payment_method ENUM('credit_card', 'debit_card', 'paypal', 'stripe', 'bank_transfer', 'wallet') NOT NULL,
+    payment_method ENUM('credit_card', 'debit_card', 'paypal', 'stripe', 'bank_transfer', 'wallet', 'razorpay') NOT NULL,
     payment_gateway VARCHAR(50) DEFAULT 'stripe',
     transaction_id VARCHAR(255) NULL,
     gateway_payment_id VARCHAR(255) NULL,

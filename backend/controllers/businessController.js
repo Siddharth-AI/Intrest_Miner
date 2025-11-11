@@ -107,7 +107,7 @@ Please analyze the interests and identify the best ones that would perform well 
 }
 
 Assign a relevance score (1-100) and rank to each interest based on how well it matches the business goals and target audience. 
-IMPORTANT: You must return AT LEAST 15 top performing interests in your response, or more if you find additional highly relevant ones.`;
+IMPORTANT: You must return AT LEAST 50 top performing interests in your response, or more if you find additional highly relevant ones.`;
 
     const response = await axios.post(
       "https://api.openai.com/v1/chat/completions",

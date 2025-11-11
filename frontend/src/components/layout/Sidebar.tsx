@@ -12,17 +12,19 @@ import {
   History,
   LogOut,
   X,
+  TrendingUp,
 } from "lucide-react";
 
 import { clearAllData } from "../../../store/features/facebookAdsSlice";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { openPricingModal } from "../../../store/features/pricingModalSlice";
 import { resetSearchState } from "../../../store/features/facebookSlice";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import { GiMiner } from "react-icons/gi";
 import { FaMoneyBillWave } from "react-icons/fa";
 import { logout } from "../../../store/features/loginSlice";
+import Portal from "../ui/Portal";
+import { fetchProfileData } from "../../../store/features/profileSlice";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -45,7 +47,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, isCollapsed }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-
+  useEffect(() => {
+    dispatch(fetchProfileData());
+  }, [dispatch]);
   // Check if mobile (using sm breakpoint: 640px)
   useEffect(() => {
     const checkMobile = () => {
@@ -90,6 +94,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, isCollapsed }) => {
   // Handle click outside user menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // Skip click outside logic when sidebar is collapsed to avoid conflicts with Portal
+      if (isCollapsed && !isMobile) {
+        return;
+      }
+
       if (
         userMenuRef.current &&
         !userMenuRef.current.contains(event.target as Node)
@@ -99,11 +108,22 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, isCollapsed }) => {
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [showUserMenu, isCollapsed, isMobile]);
+
+  useEffect(() => {
+    if (showUserMenu && isCollapsed && !isMobile) {
+      // Auto close after 5 seconds for collapsed mode
+      const timer = setTimeout(() => {
+        setShowUserMenu(false);
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [showUserMenu, isCollapsed, isMobile]);
 
   const handleLogout = () => {
     // Clear authentication token
-    localStorage.removeItem("token");
+    localStorage.clear();
 
     // Clear Facebook data and token
     dispatch(clearAllData());
@@ -139,11 +159,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, isCollapsed }) => {
       active: location.pathname === "/permium-miner",
     },
     {
-      name: "Campaign Analytics",
+      name: "Basic Analytics",
       icon: BarChart3,
       path: "/analytics",
       active: location.pathname === "/analytics",
       badge: "New",
+    },
+    {
+      name: "Advance Analytics",
+      icon: TrendingUp,
+      path: "/advance-analytics",
+      active: location.pathname === "/advance-analytics",
+      badge: "Pro",
     },
   ];
 
@@ -406,7 +433,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, isCollapsed }) => {
             {showUserMenu &&
               (isCollapsed && !isMobile ? (
                 // Render as a floating panel outside of sidebar
-                ReactDOM.createPortal(
+                <Portal>
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -432,9 +459,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, isCollapsed }) => {
                       <LogOut className="w-4 h-4 mr-3" />
                       Logout
                     </button>
-                  </motion.div>,
-                  document.body
-                )
+                  </motion.div>
+                </Portal>
               ) : (
                 // Default dropdown inside sidebar for normal mode/mobile
                 <motion.div

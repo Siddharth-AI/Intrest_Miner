@@ -1,7 +1,6 @@
-// Add this at the very top to load environment variables
+const mysql = require("mysql2");
 require("dotenv").config();
 
-const mysql = require("mysql2");
 
 console.log("Database.js - Environment check:");
 console.log("- DB_HOST:", process.env.DB_HOST || "NOT SET");
@@ -14,10 +13,7 @@ const connection = mysql.createConnection({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME || "interest_miner",
-  ssl: {
-    ca: process.env.DB_SSL_CERT,
-    rejectUnauthorized: false,
-  },
+
 });
 
 connection.connect((err) => {
@@ -28,4 +24,20 @@ connection.connect((err) => {
   console.log("Connected to the MySQL database.");
 });
 
-module.exports = connection;
+if (!process.env.DB_HOST || !process.env.DB_USER) {
+  console.error("❌ Missing required database environment variables!");
+  console.error(
+    "Please check your .env file contains: DB_HOST, DB_USER, DB_PASSWORD"
+  );
+  process.exit(1);
+}
+
+const pool = mysql.createPool({
+  connectionLimit: 10,
+  host: process.env.DB_HOST || "localhost",
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "",
+  database: process.env.DB_NAME || "interest_miner"
+});
+
+module.exports = { connection, pool };

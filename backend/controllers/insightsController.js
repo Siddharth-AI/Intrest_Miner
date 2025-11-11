@@ -1,10 +1,25 @@
-const { adjustDateRange, classifyCampaign, getTokenFromHeader } = require("../utils/helper");
+const { adjustDateRange, classifyCampaign } = require("../utils/helper");
 const { getCampaigns, getCampaignInsights } = require("../services/metaApiService");
 const { calculateTotals, recommendCampaign, getPerformanceCategory } = require("../utils/calculateKpi");
+const { getFacebookToken } = require("../models/facebookModel");
 
 const insightsReport = async (req, res) => {
   try {
-    const token = getTokenFromHeader(req);
+    const userUuid = req.user.uuid; // 🔥 CHANGED: Use UUID instead of user_id
+    console.log("🔄 Fetching insights for user:", userUuid);
+
+    // Get user's Facebook token from database (now uses connections)
+    const userFacebookToken = await getFacebookToken(userUuid); // 🔥 CHANGED: Pass UUID
+
+    if (!userFacebookToken) {
+      return res.status(400).json({
+        success: false,
+        error: 'Facebook account not connected. Please connect your Facebook account first.'
+      });
+    }
+
+    console.log("✅ Found user's Facebook token");
+
     const { mode, adAccountId, campaignId, date_start, date_stop, campaign_status, objective } = req.body;
 
     if (!adAccountId) return res.status(400).json({ error: "adAccountId is required in body" });
@@ -13,8 +28,9 @@ const insightsReport = async (req, res) => {
     if (mode === "single") {
       if (!campaignId) return res.status(400).json({ error: "campaignId is required for single mode" });
 
-      const campaigns = await getCampaigns(adAccountId, token);
+      const campaigns = await getCampaigns(adAccountId, userFacebookToken);
       const campaign = campaigns.find(c => c.id === campaignId);
+
       if (!campaign) return res.status(404).json({ error: "Campaign not found" });
 
       let filters = {};
@@ -25,7 +41,7 @@ const insightsReport = async (req, res) => {
         filters.date_preset = "maximum";
       }
 
-      const insights = await getCampaignInsights(campaignId, token, filters);
+      const insights = await getCampaignInsights(campaignId, userFacebookToken, filters);
       const totals = calculateTotals(insights);
 
       return res.json({ mode, campaignId, campaign_name: campaign.name, totals, insights });
@@ -33,7 +49,7 @@ const insightsReport = async (req, res) => {
 
     // ========== MODE: ANALYZE ==========
     if (mode === "analyze") {
-      const campaigns = await getCampaigns(adAccountId, token);
+      const campaigns = await getCampaigns(adAccountId, userFacebookToken);
       let campaignAnalysis = [];
       let overallTotals = {
         impressions: 0,
@@ -68,12 +84,11 @@ const insightsReport = async (req, res) => {
           filters.date_preset = "maximum";
         }
 
-        const insights = await getCampaignInsights(campaign.id, token, filters);
+        const insights = await getCampaignInsights(campaign.id, userFacebookToken, filters);
         const totals = calculateTotals(insights);
 
         // 🔮 classify each campaign with human-like analysis
         const verdict = classifyCampaign(campaign, totals);
-
         campaignAnalysis.push({ ...campaign, totals, verdict });
 
         // accumulate totals

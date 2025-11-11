@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
     searches_used INT DEFAULT 0,
     searches_remaining INT NOT NULL,
     start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    end_date TIMESTAMP NOT NULL,
+    end_date DATETIME NOT NULL,
     auto_renew TINYINT(1) DEFAULT 1,
     cancelled_at TIMESTAMP NULL,
     cancellation_reason TEXT NULL,

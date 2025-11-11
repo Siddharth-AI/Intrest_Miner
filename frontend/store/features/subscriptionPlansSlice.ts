@@ -5,6 +5,7 @@ import axios from 'axios';
 
 // Define the interface for a single pricing tier as received from the API
 export interface ApiPricingTier {
+  id: number; // Add this missing field
   uuid: string;
   name: string;
   description: string;
@@ -40,10 +41,9 @@ export const fetchSubscriptionPlans = createAsyncThunk(
       const response = await axios.get<{ data: ApiPricingTier[] }>(
         `${import.meta.env.VITE_INTEREST_MINER_API_URL}/subscription-plans`
       );
+
       // Filter out inactive plans and sort by sort_order
       const activeAndSortedPlans = response.data.data;
-
-
       console.log(activeAndSortedPlans, "my plans=>>>>>>>>>>>>>>")
       return activeAndSortedPlans;
     } catch (error: any) {

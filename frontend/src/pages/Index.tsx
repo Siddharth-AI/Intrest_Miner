@@ -14,17 +14,40 @@ import BusinessInfoForm from "@/components/forms/BusinessInfoForm";
 import InterestResults from "@/components/common/InterestResults";
 import type { BusinessFormData } from "@/types/business";
 import { motion, AnimatePresence } from "framer-motion";
-
+import PremiumMinerHelpModal from "../components/modals/PremiumMinerHelpModal";
+import FloatingHelpButton from "../components/common/FloatingHelpButton";
 // Redux imports
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { openPricingModal } from "../../store/features/pricingModalSlice";
 import { useNavigate } from "react-router-dom";
 import { fetchProfileData } from "../../store/features/profileSlice";
 import { resetOpenAiState } from "../../store/features/openaiSlice";
+import {
+  fetchOnboardingStatus,
+  updateOnboardingStatus,
+} from "../../store/features/onboardingSlice";
+
+// Add these imports at the top
+import {
+  Crown,
+  ChartBarIcon,
+  EyeIcon,
+  SparklesIcon,
+  UsersIcon,
+} from "lucide-react";
+import HelpTooltip from "@/components/common/HelpTooltip";
+import Portal from "@/components/ui/Portal";
 
 const InterestGenerator = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  // Get onboarding status from Redux store
+  const { hasSeenInterestMinerTutorial, loading: onboardingLoading } =
+    useAppSelector((state) => state.onboarding);
+
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+
+  const [showHelpTooltip, setShowHelpTooltip] = useState(true);
   const {
     data: userProfile,
     loading,
@@ -34,6 +57,8 @@ const InterestGenerator = () => {
   const [businessData, setBusinessData] = useState<BusinessFormData | null>(
     null
   );
+
+  const hasActiveSubscription = userProfile?.subscription_status === "active";
 
   const { data: openAiData } = useAppSelector((state) => state.openAi);
 
@@ -54,6 +79,10 @@ const InterestGenerator = () => {
   }, []);
 
   useEffect(() => {
+    dispatch(fetchOnboardingStatus());
+  }, [dispatch]);
+
+  useEffect(() => {
     if (!businessData && openAiData && openAiData.businessInfo) {
       console.log("Restoring business data from persisted state");
       setBusinessData(openAiData.businessInfo);
@@ -67,18 +96,16 @@ const InterestGenerator = () => {
 
   console.log(businessData, "testing data check>>>>>>>>>>>>>>>");
 
+  // Show tutorial based on backend data
   useEffect(() => {
-    const hasSeenTutorial = localStorage.getItem(
-      "hasSeenInterestMinerTutorial"
-    );
+    if (onboardingLoading) return; // Wait for data to load
 
-    if (!hasSeenTutorial) {
+    if (!hasSeenInterestMinerTutorial) {
       setShowTutorialPopup(true);
-      localStorage.setItem("hasSeenInterestMinerTutorial", "true");
     } else {
       setShowTutorialButton(true);
     }
-  }, []);
+  }, [hasSeenInterestMinerTutorial, onboardingLoading]);
 
   const handleFormSubmit = async (data: BusinessFormData) => {
     setBusinessData(data);
@@ -106,6 +133,9 @@ const InterestGenerator = () => {
   const handleCloseTutorial = () => {
     setShowTutorialPopup(false);
     setShowTutorialButton(true);
+
+    // Update backend
+    dispatch(updateOnboardingStatus({ hasSeenInterestMinerTutorial: true }));
   };
 
   const handleOpenTutorial = () => {
@@ -116,37 +146,273 @@ const InterestGenerator = () => {
     setShowTutorialButton(false);
   };
 
+  if (!hasActiveSubscription) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 flex items-center justify-center relative overflow-hidden">
+        {/* Background Elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-300/20 dark:bg-blue-600/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-300/20 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-200/10 dark:bg-purple-600/5 rounded-full blur-3xl animate-pulse delay-500"></div>
+        </div>
+
+        {/* Floating Icons */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <motion.div
+            animate={{ y: [0, -20, 0], rotate: [0, 5, 0] }}
+            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-20 left-20 text-purple-400/30 dark:text-purple-500/20">
+            <Crown className="w-8 h-8" />
+          </motion.div>
+          <motion.div
+            animate={{ y: [0, 15, 0], rotate: [0, -5, 0] }}
+            transition={{
+              duration: 8,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: 1,
+            }}
+            className="absolute top-40 right-32 text-pink-400/30 dark:text-pink-500/20">
+            <Sparkles className="w-6 h-6" />
+          </motion.div>
+        </div>
+
+        {/* Main Content */}
+        <motion.div
+          initial={{ opacity: 0, y: 40, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{
+            duration: 0.8,
+            ease: "easeOut",
+            type: "spring",
+            stiffness: 100,
+          }}
+          className="relative z-10 text-center max-w-5xl mx-auto p-8">
+          <div className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/30 p-10 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-orange-500/5 dark:from-purple-400/10 dark:to-orange-400/10 rounded-3xl"></div>
+
+            <div className="relative z-10">
+              {/* Title */}
+              <motion.h2
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.5 }}
+                className="text-3xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-orange-600 dark:from-purple-400 dark:via-pink-400 dark:to-orange-400 bg-clip-text text-transparent mb-3">
+                Unlock Premium Interest Mining 💎
+              </motion.h2>
+
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.6 }}
+                className="text-gray-600 dark:text-gray-300 text-lg mb-8 leading-relaxed">
+                Get top 50 guaranteed high-converting interests hand-picked by
+                AI from thousands of possibilities.
+              </motion.p>
+
+              {/* Premium vs Standard Comparison */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.7 }}
+                className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div className="p-6 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-2xl border border-gray-200 dark:border-gray-600">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="w-12 h-12 bg-gray-500/10 rounded-xl flex items-center justify-center">
+                      <Target className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-700 dark:text-gray-300">
+                      Standard Miner
+                    </h3>
+                  </div>
+                  <ul className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
+                    <li className="flex items-start space-x-2">
+                      <span className="text-gray-400 mt-1">•</span>
+                      <span>Keyword-based discovery</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-gray-400 mt-1">•</span>
+                      <span>Hundreds of general suggestions</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-gray-400 mt-1">•</span>
+                      <span>Manual filtering required</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-gray-400 mt-1">•</span>
+                      <span>Basic relevance scoring</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="p-6 bg-gradient-to-br from-purple-50 to-orange-50 dark:from-purple-900/20 dark:to-orange-900/20 rounded-2xl border-2 border-purple-200 dark:border-purple-700/30 relative">
+                  <div className="absolute -top-3 -right-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                    PREMIUM
+                  </div>
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                      <Crown className="w-6 h-6 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-purple-700 dark:text-purple-300">
+                      Premium Miner
+                    </h3>
+                  </div>
+                  <ul className="space-y-3 text-sm text-purple-600 dark:text-purple-400">
+                    <li className="flex items-start space-x-2">
+                      <span className="text-purple-500 mt-1">✓</span>
+                      <span>AI analyzes thousands of interests</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-purple-500 mt-1">✓</span>
+                      <span>Top 15 guaranteed high-converters</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-purple-500 mt-1">✓</span>
+                      <span>Performance & competition analysis</span>
+                    </li>
+                    <li className="flex items-start space-x-2">
+                      <span className="text-purple-500 mt-1">✓</span>
+                      <span>Business-specific optimization</span>
+                    </li>
+                  </ul>
+                </div>
+              </motion.div>
+
+              {/* Premium Features */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.8 }}
+                className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-xl border border-purple-200 dark:border-purple-700/30">
+                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-1">
+                    15
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    Top Interests
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gradient-to-br from-pink-50 to-pink-100 dark:from-pink-900/20 dark:to-pink-800/20 rounded-xl border border-pink-200 dark:border-pink-700/30">
+                  <div className="text-2xl font-bold text-pink-600 dark:text-pink-400 mb-1">
+                    95%
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    Relevance Score
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-xl border border-orange-200 dark:border-orange-700/30">
+                  <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 mb-1">
+                    10K+
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    Analyzed
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl border border-blue-200 dark:border-blue-700/30">
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">
+                    AI
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    Powered
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* CTA Button */}
+              <motion.button
+                initial={{ opacity: 0, y: 30, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.8, delay: 0.9 }}
+                whileHover={{
+                  scale: 1.05,
+                  boxShadow:
+                    "0 20px 25px -5px rgba(168, 85, 247, 0.4), 0 10px 10px -5px rgba(168, 85, 247, 0.2)",
+                }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => dispatch(openPricingModal())}
+                className="group relative w-full px-8 py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-orange-600 text-white font-semibold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
+
+                <div className="relative flex items-center justify-center space-x-3">
+                  <Crown className="w-5 h-5" />
+                  <span className="text-lg">Upgrade to Premium</span>
+                  <motion.div
+                    animate={{ x: [0, 4, 0] }}
+                    transition={{
+                      duration: 1.5,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                    className="ml-1">
+                    →
+                  </motion.div>
+                </div>
+              </motion.button>
+
+              {/* Bottom Benefits */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, delay: 1.0 }}
+                className="mt-6 p-4 bg-gradient-to-r from-purple-50/50 to-orange-50/50 dark:from-purple-900/20 dark:to-orange-900/20 rounded-xl border border-purple-200/50 dark:border-purple-700/30">
+                <div className="flex items-start space-x-3">
+                  <div className="w-5 h-5 text-purple-500 mt-0.5 flex-shrink-0">
+                    <Crown className="w-5 h-5" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Premium Interest Mining
+                    </p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                      Skip the guesswork. Get top 50 guaranteed high-converting
+                      interests tailored to your business.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative pb-16 min-h-screen bg-gradient-to-br from-[#f1f5f9] to-[rgba(124,58,237,0.11)] dark:from-gray-900 dark:to-gray-800">
       {/* Tutorial Pop-up (Full screen) */}
       <AnimatePresence>
-        {showTutorialPopup && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
+        {showTutorialPopup && !onboardingLoading && (
+          <Portal>
             <motion.div
-              initial={{ scale: 0.8, y: 50 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.8, y: 50 }}
-              className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-3xl h-auto aspect-video">
-              <button
-                onClick={handleCloseTutorial}
-                className="absolute top-1 right-1 bg-blue-500/20 text-white hover:bg-blue-700 hover:text-red-500 z-10">
-                <X size={24} />
-              </button>
-              <iframe
-                width="100%"
-                height="100%"
-                src="https://www.youtube.com/embed/FwOTs4UxQS4?si=ghEcv5GvYblvyDiL"
-                title="InterestMiner Tutorial"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="rounded-lg"></iframe>
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ scale: 0.8, y: 50 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.8, y: 50 }}
+                className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-3xl h-auto aspect-video">
+                <button
+                  onClick={handleCloseTutorial}
+                  className="absolute top-1 right-1 bg-blue-500/20 text-white hover:bg-blue-700 hover:text-red-500 z-10">
+                  <X size={24} />
+                </button>
+                <iframe
+                  width="100%"
+                  height="100%"
+                  src="https://www.youtube.com/embed/FwOTs4UxQS4?si=ghEcv5GvYblvyDiL"
+                  title="InterestMiner Tutorial"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="rounded-lg"></iframe>
+              </motion.div>
             </motion.div>
-          </motion.div>
+          </Portal>
         )}
       </AnimatePresence>
 
@@ -316,6 +582,21 @@ const InterestGenerator = () => {
         <div className="-z-10 absolute top-[20rem] left-[20rem] w-40 h-40 bg-gradient-to-b from-purple-600 to-blue-500 rounded-full opacity-30 animate-float"></div>
         <div className="-z-10 absolute top-[20rem] right-[10rem] w-36 h-36 bg-gradient-to-t from-blue-500 to-purple-400 rounded-full opacity-20 animate-float"></div>
       </div>
+      <HelpTooltip
+        show={showHelpTooltip}
+        message="How it works"
+        onClose={() => setShowHelpTooltip(false)}
+      />
+
+      <FloatingHelpButton
+        onClick={() => setIsHelpModalOpen(true)}
+        help="Premium Miner Help"
+      />
+
+      <PremiumMinerHelpModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
+      />
     </div>
   );
 };

@@ -3,8 +3,7 @@ import UserHeader from "./UserHeader";
 import { Footer } from "./Footer";
 import Sidebar from "./Sidebar";
 import { useState } from "react";
-import CampaignModal from "@/components/model/CampaignModal"; // Import your modal
-import AnalyticsModal from "../model/AnalyticsModal";
+import { AuthFooter } from "./AuthFooter";
 export default function AuthLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -45,10 +44,8 @@ export default function AuthLayout() {
           <div className="dark:bg-gray-900">
             <Outlet />
           </div>
-          <Footer />
+          <AuthFooter />
         </main>
-        <CampaignModal />
-        <AnalyticsModal />
       </div>
     </div>
   );

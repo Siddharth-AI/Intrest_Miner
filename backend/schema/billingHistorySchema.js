@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS billing_history (
     amount DECIMAL(10,2) NOT NULL,
     currency VARCHAR(3) DEFAULT 'USD',
     billing_period_start TIMESTAMP NOT NULL,
-    billing_period_end TIMESTAMP NOT NULL,
+    billing_period_end DATETIME NOT NULL,
     billing_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status ENUM('pending', 'completed', 'failed', 'cancelled') DEFAULT 'pending',
     invoice_number VARCHAR(100) NULL,

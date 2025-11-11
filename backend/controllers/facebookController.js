@@ -1,6 +1,292 @@
 const axios = require("axios");
-const { customResponse } = require("../utils/customResponse");
+const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid'); // Add this import
 const { checkAndRefreshToken } = require("../utils/facebookTokenManager");
+const {
+  findUserByFacebookId,
+  findUserByEmail,
+  findUserById,
+  createUserWithFacebook,
+  linkFacebookToUser,
+  updateFacebookToken,
+  getUserFacebookStatus,
+  unlinkFacebookAccount
+} = require('../models/facebookModel');
+
+// Import service functions
+const {
+  exchangeCodeForToken,
+  exchangeForLongLivedToken,
+  getUserProfile,
+  generateAuthUrl
+} = require('../services/metaApiService');
+const { findConnection, findUserConnections } = require("../models/facebookConnectionModel");
+
+
+// ==================== PUBLIC ROUTES ====================
+
+const initiateFacebookLogin = async (req, res) => {
+  try {
+    console.log("🚀 Initiating Facebook OAuth login...");
+
+    // Get current user from JWT token
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
+
+    let currentUserId = null;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        currentUserId = decoded.user_id;
+        console.log("🔍 Found current user ID:", currentUserId);
+      } catch (err) {
+        console.log("⚠️ Invalid token, proceeding without user context");
+      }
+    }
+
+    // Pass user ID in state parameter
+    const state = currentUserId ? `dashboard_${currentUserId}` : 'dashboard';
+    const fbAuthUrl = generateAuthUrl(state);
+
+    console.log("✅ Facebook OAuth URL generated with state:", state);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        authUrl: fbAuthUrl
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Facebook login initiation error:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to initiate Facebook login'
+    });
+  }
+};
+
+const handleFacebookCallback = async (req, res) => {
+  try {
+    const { code, state, error } = req.query;
+
+    console.log("📝 Processing Facebook OAuth callback with state:", state);
+
+    // Extract user ID from state
+    const stateUserId = state && state.startsWith('dashboard_')
+      ? state.replace('dashboard_', '')
+      : null;
+
+    console.log("🔍 Extracted user ID from state:", stateUserId);
+
+    if (error) {
+      console.error("❌ Facebook OAuth error:", error);
+      return res.redirect(`${process.env.FRONTEND_URL}/dashboard?error=facebook_auth_denied`);
+    }
+
+    if (!code) {
+      console.error("❌ No authorization code provided");
+      return res.redirect(`${process.env.FRONTEND_URL}/dashboard?error=no_auth_code`);
+    }
+
+    // Step 1: Exchange code for short-lived token
+    const shortLivedToken = await exchangeCodeForToken(code);
+    console.log("✅ Got short-lived token");
+
+    // Step 2: Exchange for long-lived token
+    const longTokenData = await exchangeForLongLivedToken(shortLivedToken);
+    console.log("✅ Exchanged for long-lived token");
+
+    // Step 3: Get user profile from Facebook
+    const fbProfile = await getUserProfile(longTokenData.access_token);
+    console.log("✅ Retrieved user profile:", fbProfile.name);
+
+    let user = null;
+
+    // Step 4: If we have user ID from state, use that user (PRIORITY)
+    if (stateUserId) {
+      console.log("🎯 Using current logged-in user from state");
+      const currentUser = await findUserById(parseInt(stateUserId));
+
+      if (currentUser) {
+        // Link Facebook to the current logged-in user
+        await linkFacebookToUser(currentUser.uuid, {
+          fb_user_id: fbProfile.id,
+          fb_access_token: longTokenData.access_token,
+          fb_token_expires_in: longTokenData.expires_in
+        });
+        console.log("✅ Linked Facebook to current logged-in user");
+        user = currentUser;
+      } else {
+        console.error("❌ Current user not found in database");
+        return res.redirect(`${process.env.FRONTEND_URL}/dashboard?error=user_not_found`);
+      }
+    }
+    // Step 5: Fallback - check by Facebook ID or email
+    else {
+      const existingFacebookUsers = await findUserByFacebookId(fbProfile.id);
+
+      if (existingFacebookUsers && existingFacebookUsers.length > 0) {
+        // Use first user with this Facebook connection
+        const existingUser = existingFacebookUsers[0];
+        await updateFacebookToken(existingUser.id, {
+          fb_access_token: longTokenData.access_token,
+          fb_token_expires_in: longTokenData.expires_in
+        });
+        user = existingUser;
+        console.log("✅ Updated existing Facebook user's token");
+      } else {
+        // Check if user exists by email
+        const existingEmailUser = await findUserByEmail(fbProfile.email);
+
+        if (existingEmailUser) {
+          // Link Facebook to existing user account
+          await linkFacebookToUser(existingEmailUser.id, {
+            fb_user_id: fbProfile.id,
+            fb_access_token: longTokenData.access_token,
+            fb_token_expires_in: longTokenData.expires_in
+          });
+          user = existingEmailUser;
+          console.log("✅ Linked Facebook to existing user account by email");
+        } else {
+          // Create new user with Facebook (last resort)
+          user = await createUserWithFacebook({
+            uuid: uuidv4(),
+            name: fbProfile.name,
+            email: fbProfile.email || `fb_${fbProfile.id}@facebook.com`,
+            fb_user_id: fbProfile.id,
+            fb_access_token: longTokenData.access_token,
+            fb_token_expires_in: longTokenData.expires_in,
+            avatar_path: fbProfile.picture?.data?.url
+          });
+          console.log("✅ Created new user with Facebook");
+        }
+      }
+    }
+
+    // Step 6: Generate JWT token for app authentication
+    const jwtToken = jwt.sign(
+      {
+        uuid: user.uuid,
+        user_id: user.id,
+        facebook_id: fbProfile.id,
+        email: user.email
+      },
+      process.env.JWT_SECRET
+    );
+
+    // Step 7: Always redirect to dashboard with success indication
+    const redirectUrl = `${process.env.FRONTEND_URL}/dashboard?token=${jwtToken}&facebook_connected=true`;
+
+    console.log("🎉 Facebook OAuth completed successfully");
+    res.redirect(redirectUrl);
+
+  } catch (error) {
+    console.error("❌ Facebook callback error:", error);
+    res.redirect(`${process.env.FRONTEND_URL}/dashboard?error=auth_failed`);
+  }
+};
+
+// ==================== PROTECTED ROUTES ====================
+
+const getFacebookStatus = async (req, res) => {
+  try {
+    const userUuid = req.user.uuid; // Use UUID
+    console.log(`🔍 Getting Facebook status for user: ${userUuid}`);
+
+    const statusData = await getUserFacebookStatus(userUuid);
+    console.log("🔍 Status data:", statusData);
+
+    if (!statusData) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // 🔥 NEW: Get token expiry from primary_connection data (no need to query users table)
+    if (statusData.facebook_connected && statusData.facebook_token_valid && statusData.primary_connection) {
+      const primaryConnection = statusData.primary_connection;
+      console.log("🔍 Primary connection found:", primaryConnection);
+
+      const tokenUpdatedAt = new Date(primaryConnection.fb_token_updated_at);
+      const expiresAt = new Date(tokenUpdatedAt.getTime() + (primaryConnection.fb_token_expires_in * 1000));
+      const daysUntilExpiry = Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24));
+
+      statusData.token_expires_in_days = daysUntilExpiry;
+      statusData.token_expires_at = expiresAt;
+
+      console.log("✅ Token expiry calculated:", {
+        tokenUpdatedAt,
+        expiresAt,
+        daysUntilExpiry
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: statusData
+    });
+
+  } catch (error) {
+    console.error("❌ Get Facebook status error:", error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get Facebook status'
+    });
+  }
+};
+
+
+
+const unlinkFacebook = async (req, res) => {
+  try {
+    const userUuid = req.user.uuid; // Get UUID from JWT token
+    const connectionId = req.params.connectionId; // Get connection ID from URL params (optional)
+
+    console.log(`🔗 Unlinking Facebook connection - User: ${userUuid}, ConnectionID: ${connectionId || 'ALL'}`);
+
+    if (connectionId) {
+      // Unlink specific connection
+      // First, get the fb_user_id for this connection
+      const connections = await findUserConnections(userUuid);
+      const targetConnection = connections.find(conn => conn.id === parseInt(connectionId));
+
+      if (!targetConnection) {
+        return res.status(404).json({
+          success: false,
+          error: 'Facebook connection not found'
+        });
+      }
+
+      await unlinkFacebookAccount(userUuid, targetConnection.fb_user_id);
+      console.log(`✅ Specific Facebook connection unlinked: ${connectionId}`);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Facebook connection unlinked successfully',
+        connectionId: connectionId
+      });
+    } else {
+      // Unlink all connections
+      await unlinkFacebookAccount(userUuid);
+      console.log(`✅ All Facebook connections unlinked for user: ${userUuid}`);
+
+      return res.status(200).json({
+        success: true,
+        message: 'All Facebook connections unlinked successfully'
+      });
+    }
+
+  } catch (error) {
+    console.error("❌ Unlink Facebook error:", error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to unlink Facebook account'
+    });
+  }
+};
+
 
 // Search Facebook Ad Interests
 const searchAdInterests = async (req, res) => {
@@ -204,8 +490,13 @@ const refreshToken = async (req, res) => {
   }
 };
 
+
 module.exports = {
   searchAdInterests,
   getApiStatus,
   refreshToken,
+  initiateFacebookLogin,
+  handleFacebookCallback,
+  getFacebookStatus,
+  unlinkFacebook
 };

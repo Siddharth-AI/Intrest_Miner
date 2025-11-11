@@ -7,26 +7,81 @@ interface RazorpayState {
   orderLoading: boolean;
   orderError: string | null;
   orderData: any | null; // To store the order details from backend
-
   verificationLoading: boolean;
   verificationError: string | null;
   verificationSuccess: boolean;
 }
 
-const initialState: RazorpayState = {
+// Define interface for coupon validation
+interface CouponValidationData {
+  coupon: {
+    uuid: string;
+    code: string;
+    name: string;
+    description: string;
+    discount_type: string;
+    discount_value: number;
+  };
+  pricing: {
+    original_amount: number;
+    discount_amount: number;
+    final_amount: number;
+    savings_percentage: string;
+  };
+}
+
+interface CouponState {
+  validationLoading: boolean;
+  validationError: string | null;
+  appliedCoupon: CouponValidationData | null;
+}
+
+// Extended state with coupon functionality
+interface ExtendedRazorpayState extends RazorpayState, CouponState { }
+
+const initialState: ExtendedRazorpayState = {
   orderLoading: false,
   orderError: null,
   orderData: null,
-
   verificationLoading: false,
   verificationError: null,
   verificationSuccess: false,
+  validationLoading: false,
+  validationError: null,
+  appliedCoupon: null,
 };
 
-// Async Thunk for creating Razorpay Order
+// Async Thunk for validating coupon
+export const validateCoupon = createAsyncThunk(
+  'razorpay/validateCoupon',
+  async (data: { coupon_code: string; plan_id: number }, { rejectWithValue }) => {
+    try {
+      const accessToken = localStorage.getItem('token');
+      if (!accessToken) {
+        return rejectWithValue('No access token found');
+      }
+
+      const response = await axios.post(
+        `${import.meta.env.VITE_INTEREST_MINER_API_URL}/api/coupons/validate`,
+        data,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      return response.data.data; // Return coupon validation data
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Invalid coupon code');
+    }
+  }
+);
+
+// Updated Async Thunk for creating Razorpay Order with coupon support
 export const createRazorpayOrder = createAsyncThunk(
   'razorpay/createOrder',
-  async (planUuid: number, { rejectWithValue }) => {
+  async (data: { plan_id: number; coupon_code?: string }, { rejectWithValue }) => {
     try {
       const accessToken = localStorage.getItem('token');
       if (!accessToken) {
@@ -35,7 +90,7 @@ export const createRazorpayOrder = createAsyncThunk(
 
       const response = await axios.post(
         `${import.meta.env.VITE_INTEREST_MINER_API_URL}/subscriptions/razorpay/order`,
-        { plan_id: planUuid },
+        data,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -43,7 +98,7 @@ export const createRazorpayOrder = createAsyncThunk(
         }
       );
 
-      return response.data; // This should contain order, payment_uuid, plan
+      return response.data; // This should contain order, payment_uuid, plan, coupon_applied
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || error.message || 'Failed to create Razorpay order');
     }
@@ -58,7 +113,7 @@ export const verifyRazorpayPayment = createAsyncThunk(
     payment_id: string;
     signature: string;
     payment_uuid: string;
-    plan_id: number; // This should be the plan's UUID, not sort_order
+    plan_id: number;
     auto_renew: number;
   }, { rejectWithValue }) => {
     try {
@@ -96,10 +151,40 @@ const razorpaySlice = createSlice({
       state.verificationLoading = false;
       state.verificationError = null;
       state.verificationSuccess = false;
+      state.validationLoading = false;
+      state.validationError = null;
+      state.appliedCoupon = null;
+    },
+
+    // Clear applied coupon
+    clearAppliedCoupon: (state) => {
+      state.appliedCoupon = null;
+      state.validationError = null;
+    },
+
+    // Clear coupon validation error
+    clearCouponError: (state) => {
+      state.validationError = null;
     },
   },
   extraReducers: (builder) => {
     builder
+      // validateCoupon reducers
+      .addCase(validateCoupon.pending, (state) => {
+        state.validationLoading = true;
+        state.validationError = null;
+      })
+      .addCase(validateCoupon.fulfilled, (state, action: PayloadAction<CouponValidationData>) => {
+        state.validationLoading = false;
+        state.appliedCoupon = action.payload;
+        state.validationError = null;
+      })
+      .addCase(validateCoupon.rejected, (state, action) => {
+        state.validationLoading = false;
+        state.validationError = action.payload as string;
+        state.appliedCoupon = null;
+      })
+
       // createRazorpayOrder reducers
       .addCase(createRazorpayOrder.pending, (state) => {
         state.orderLoading = true;
@@ -115,6 +200,7 @@ const razorpaySlice = createSlice({
         state.orderLoading = false;
         state.orderError = action.payload as string;
       })
+
       // verifyRazorpayPayment reducers
       .addCase(verifyRazorpayPayment.pending, (state) => {
         state.verificationLoading = true;
@@ -133,5 +219,5 @@ const razorpaySlice = createSlice({
   },
 });
 
-export const { resetRazorpayState } = razorpaySlice.actions;
+export const { resetRazorpayState, clearAppliedCoupon, clearCouponError } = razorpaySlice.actions;
 export default razorpaySlice.reducer;

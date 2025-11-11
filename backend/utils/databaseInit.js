@@ -5,6 +5,8 @@ const subscriptionPlanSchema = require("../schema/subscriptionPlanSchema");
 const userSubscriptionSchema = require("../schema/userSubscriptionSchema");
 const paymentSchema = require("../schema/paymentSchema");
 const billingHistorySchema = require("../schema/billingHistorySchema");
+const couponSchema = require("../schema/couponSchema");
+const couponUsageSchema = require("../schema/couponUsageSchema");
 const businessDetailHistorySchema = require("../schema/businessDetailsHIstorySchema")
 const {
   initializeDefaultPlans,
@@ -72,6 +74,8 @@ const initializeDatabase = async (forceRecreate = false) => {
     await createTable(searchHistorySchema);
 
     await createTable(subscriptionPlanSchema);
+    await createTable(couponSchema);
+    await createTable(couponUsageSchema);
 
     // Initialize default plans
     await initializeDefaultPlans();

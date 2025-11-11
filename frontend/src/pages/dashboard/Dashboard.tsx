@@ -15,13 +15,7 @@ import {
   CursorArrowRaysIcon,
   UsersIcon,
 } from "@heroicons/react/24/outline";
-import {
-  motion,
-  useAnimation,
-  Variants,
-  AnimatePresence,
-  useInView,
-} from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import {
   fetchAdAccounts,
@@ -30,7 +24,13 @@ import {
   setSelectedAccount,
   setSelectedCampaign,
   fetchCampaignInsights,
+  checkFacebookStatus,
 } from "../../../store/features/facebookAdsSlice";
+import {
+  fetchOnboardingStatus,
+  updateOnboardingStatus,
+} from "../../../store/features/onboardingSlice";
+
 import { useToast } from "../../hooks/use-toast";
 import {
   Select,
@@ -38,127 +38,135 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import OnboardingModal from "../../components/modals/OnboardingModal";
+import FloatingHelpButton from "@/components/common/FloatingHelpButton";
+import DashboardHelpModal from "@/components/modals/DashboardHelpModal";
+import HelpTooltip from "@/components/common/HelpTooltip";
 
-// Add this component to show token status
-const TokenStatus = () => {
-  const [tokenInfo, setTokenInfo] = useState<{
-    daysLeft: number;
-    isExpiring: boolean;
-  } | null>(null);
+// NEW - Use Facebook auth state instead of profile data
+const TokenStatus: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
+  const { facebookAuth } = useAppSelector((state) => state.facebookAds);
 
-  useEffect(() => {
-    const timestamp = localStorage.getItem("FB_TOKEN_TIMESTAMP");
-    if (timestamp) {
-      const tokenAge = Date.now() - parseInt(timestamp);
-      const daysOld = tokenAge / (1000 * 60 * 60 * 24);
-      const daysLeft = 60 - Math.floor(daysOld);
+  if (!facebookAuth.isConnected || !facebookAuth.status?.facebook_token_valid) {
+    return null;
+  }
 
-      setTokenInfo({
-        daysLeft: Math.max(0, daysLeft),
-        isExpiring: daysLeft <= 10,
-      });
-    }
-  }, []);
+  const primaryConnection = facebookAuth.primaryConnection;
+  if (!primaryConnection) return null;
 
-  if (!tokenInfo) return null;
-
-  return (
-    <div
-      className={`p-3 rounded-lg text-sm ${
-        tokenInfo.isExpiring
-          ? "bg-yellow-50 text-yellow-800 border border-yellow-200"
-          : "bg-green-50 text-green-800 border border-green-200"
-      }`}>
-      <span className="font-medium">
-        Token Status: {tokenInfo.daysLeft} days remaining
-      </span>
-      {tokenInfo.isExpiring && (
-        <span className="ml-2">⚠️ Please reconnect soon</span>
-      )}
-    </div>
-  );
-};
-
-// Enhanced Animation Variants
-const containerVariants: Variants = {
-  hidden: {
-    opacity: 0,
-    scale: 0.95,
-  },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: {
-      duration: 0.6,
-      ease: [0.25, 0.1, 0.25, 1],
-      staggerChildren: 0.08,
-      delayChildren: 0.1,
-    },
-  },
-};
-
-const fadeInUp: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 24,
-    scale: 0.95,
-  },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.5,
-      ease: [0.25, 0.1, 0.25, 1],
-    },
-  },
-};
-
-const cardHover = {
-  rest: {
-    y: 0,
-    scale: 1,
-    rotateX: 0,
-    boxShadow: "0 4px 20px rgba(0, 0, 0, 0.05)",
-  },
-  hover: {
-    y: -8,
-    scale: 1.02,
-    rotateX: 2,
-    boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
-    transition: {
-      duration: 0.3,
-      ease: [0.25, 0.1, 0.25, 1],
-    },
-  },
-};
-
-const glowAnimation = {
-  initial: { opacity: 0 },
-  animate: {
-    opacity: [0.3, 0.6, 0.3],
-    scale: [1, 1.1, 1],
-    transition: {
-      duration: 3,
-      repeat: Infinity,
-      ease: "easeInOut",
-    },
-  },
-};
-
-// Enhanced StatCard Component
-const StatCard: React.FC<any> = ({ card, isDarkMode, index }) => {
-  const ref = React.useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-50px" });
+  const tokenAge =
+    (Date.now() - new Date(primaryConnection.fb_token_updated_at).getTime()) /
+    1000;
+  const remainingSeconds = primaryConnection.fb_token_expires_in - tokenAge;
+  const daysLeft = Math.ceil(remainingSeconds / (24 * 60 * 60));
+  const isExpiring = daysLeft <= 10 && daysLeft > 0;
 
   return (
     <motion.div
-      ref={ref}
-      initial="rest"
-      whileHover="hover"
-      animate="rest"
-      variants={cardHover}
-      className={`group rounded-3xl p-6 min-w-[240px] border backdrop-blur-xl relative overflow-hidden cursor-pointer transition-all duration-300`}
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={` px-3 py-[14px] border rounded-2xl font-semibold shadow-lg transition-all duration-300  ${
+        isExpiring
+          ? isDarkMode
+            ? "bg-amber-900/20 border-amber-700/50 text-amber-300"
+            : "bg-amber-50 border-amber-200 text-amber-800"
+          : isDarkMode
+          ? "bg-green-900/20 border-green-700/50 text-green-300"
+          : "bg-green-50 border-green-200 text-green-800"
+      }`}>
+      <div className="flex items-center gap-2 text-sm">
+        <div
+          className={`w-2 h-2 rounded-full ${
+            isExpiring ? "bg-amber-400" : "bg-green-400"
+          }`}
+        />
+        {isExpiring ? (
+          <span>⚠️ Reconnect Facebook soon to avoid data interruption.</span>
+        ) : (
+          <span> Facebook connected</span>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
+// Facebook Connection Banner Component
+const FacebookConnectionBanner: React.FC<{
+  isDarkMode: boolean;
+  onConnect: () => void;
+}> = ({ isDarkMode, onConnect }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className={`relative overflow-hidden rounded-2xl p-6 mb-8 border-l-4 ${
+        isDarkMode
+          ? "bg-slate-800/50 border-l-yellow-500 border border-slate-700/50"
+          : "bg-yellow-50/80 border-l-yellow-500 border border-yellow-200/50"
+      }`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-start gap-4 flex-1">
+          <div
+            className={`p-2 rounded-lg ${
+              isDarkMode ? "bg-yellow-500/20" : "bg-yellow-200/60"
+            }`}>
+            <svg
+              className="w-6 h-6 text-yellow-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 19c-.77.833.192 2.5 1.732 2.5z"
+              />
+            </svg>
+          </div>
+
+          <div>
+            <h3
+              className={`text-xl font-bold mb-2 ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}>
+              Dashboard Features Disabled
+            </h3>
+            <p
+              className={`${
+                isDarkMode ? "text-gray-300" : "text-gray-600"
+              } mb-3`}>
+              You're seeing zeros and "pending" status because your Meta
+              Business account isn't connected yet.
+              <span className="font-semibold text-yellow-500">
+                {" "}
+                Connect now to see your real campaign data and unlock all
+                dashboard features!
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <motion.button
+          onClick={onConnect}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="px-6 py-3 bg-gradient-to-r from-yellow-600 to-yellow-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 whitespace-nowrap">
+          Connect Facebook
+        </motion.button>
+      </div>
+    </motion.div>
+  );
+};
+
+// StatCard Component - Simple animations only
+const StatCard: React.FC<any> = ({ card, isDarkMode, index }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.1, duration: 0.3 }}
+      className={`group rounded-3xl p-6 min-w-[240px] border backdrop-blur-xl relative overflow-hidden cursor-pointer transition-all duration-300 hover:transform hover:scale-105`}
       style={{
         background: isDarkMode
           ? `linear-gradient(145deg, rgba(30,38,52,0.95) 0%, rgba(20,25,35,0.9) 100%)`
@@ -167,91 +175,46 @@ const StatCard: React.FC<any> = ({ card, isDarkMode, index }) => {
           ? "rgba(59,130,246,0.2)"
           : "rgba(59,130,246,0.15)",
       }}>
-      {/* Animated background gradient */}
-      <motion.div
-        variants={glowAnimation}
-        initial="initial"
-        animate={isInView ? "animate" : "initial"}
-        className={`absolute -top-4 -right-4 w-24 h-24 rounded-full blur-2xl ${
-          isDarkMode
-            ? "bg-gradient-to-br from-blue-500/30 to-cyan-500/20"
-            : "bg-gradient-to-br from-blue-300/40 to-cyan-300/30"
-        }`}
-      />
-
-      {/* Icon container with enhanced styling */}
-      <motion.div
-        whileHover={{
-          scale: 1.1,
-          rotate: 5,
-          transition: { duration: 0.2 },
-        }}
+      <div
         className={`w-14 h-14 flex items-center justify-center rounded-2xl mb-4 shadow-lg transition-all duration-300 ${
           isDarkMode
-            ? "bg-gradient-to-br from-slate-700/50 to-slate-800/50 border border-slate-600/30 group-hover:from-blue-600/20 group-hover:to-cyan-600/20"
-            : "bg-gradient-to-br from-white to-gray-50 border border-gray-200/50 group-hover:from-blue-50 group-hover:to-cyan-50"
+            ? "bg-gradient-to-br from-slate-700/50 to-slate-800/50 border border-slate-600/30"
+            : "bg-gradient-to-br from-white to-gray-50 border border-gray-200/50"
         }`}>
         <card.icon
           className={`w-7 h-7 transition-colors duration-300 ${
-            isDarkMode
-              ? "text-blue-400 group-hover:text-blue-300"
-              : "text-blue-600 group-hover:text-blue-700"
+            isDarkMode ? "text-blue-400" : "text-blue-600"
           }`}
         />
-      </motion.div>
+      </div>
 
-      {/* Animated value counter */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
-        transition={{ delay: index * 0.1 + 0.3, duration: 0.4 }}
-        className={`text-3xl font-bold mb-2 ${card.valueColor}`}>
+      <div className={`text-3xl font-bold mb-2 ${card.valueColor}`}>
         {card.value}
-      </motion.div>
+      </div>
 
-      {/* Title */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={isInView ? { opacity: 1 } : { opacity: 0 }}
-        transition={{ delay: index * 0.1 + 0.4 }}
+      <div
         className={`text-lg font-semibold mb-2 ${
           isDarkMode ? "text-gray-100" : "text-gray-800"
         }`}>
         {card.title}
-      </motion.div>
+      </div>
 
-      {/* Description */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={isInView ? { opacity: 1 } : { opacity: 0 }}
-        transition={{ delay: index * 0.1 + 0.5 }}
+      <div
         className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
         {card.description}
-      </motion.div>
-
-      {/* Subtle shine effect on hover */}
-      <motion.div
-        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -skew-x-12 -translate-x-full"
-        whileHover={{
-          translateX: "200%",
-          transition: { duration: 0.6 },
-        }}
-      />
+      </div>
     </motion.div>
   );
 };
 
-// Enhanced QuickActionCard Component
+// QuickActionCard Component - Simple animations only
 const QuickActionCard: React.FC<any> = ({ action, isDarkMode }) => {
   return (
     <motion.div
-      whileHover={{
-        y: -10,
-        rotateX: 5,
-        transition: { duration: 0.3 },
-      }}
-      whileTap={{ scale: 0.98 }}
-      className={`group rounded-3xl p-8 border relative overflow-hidden backdrop-blur-xl transition-all duration-300`}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: 0.3, duration: 0.3 }}
+      className={`group rounded-3xl p-8 border relative overflow-hidden backdrop-blur-xl transition-all duration-300 hover:transform hover:-translate-y-2`}
       style={{
         background: isDarkMode
           ? `linear-gradient(145deg, rgba(30,38,52,0.9) 0%, rgba(20,25,35,0.95) 100%)`
@@ -260,36 +223,15 @@ const QuickActionCard: React.FC<any> = ({ action, isDarkMode }) => {
           ? "rgba(59,130,246,0.2)"
           : "rgba(59,130,246,0.15)",
       }}>
-      {/* Dynamic background pattern */}
-      <motion.div
-        className="absolute inset-0 opacity-5"
-        animate={{
-          backgroundPosition: ["0% 0%", "100% 100%"],
-          transition: { duration: 8, repeat: Infinity, ease: "linear" },
-        }}
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-        }}
-      />
-
-      <motion.div
-        className="flex items-start gap-4 mb-6"
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.2 }}>
-        <motion.div
-          whileHover={{
-            rotate: 10,
-            scale: 1.1,
-            transition: { duration: 0.2 },
-          }}
+      <div className="flex items-start gap-4 mb-6">
+        <div
           className={`p-3 rounded-xl ${
             isDarkMode
               ? "bg-gradient-to-br from-blue-600/20 to-cyan-600/20 border border-blue-500/20"
               : "bg-gradient-to-br from-blue-100 to-cyan-100 border border-blue-200"
           }`}>
           <action.icon className={`w-6 h-6 ${action.iconColor}`} />
-        </motion.div>
+        </div>
 
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
@@ -299,17 +241,12 @@ const QuickActionCard: React.FC<any> = ({ action, isDarkMode }) => {
               }`}>
               {action.title}
             </h3>
-            <AnimatePresence>
-              {action.badge && (
-                <motion.span
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0, opacity: 0 }}
-                  className={`${action.badgeColor} text-xs px-3 py-1 rounded-full font-semibold`}>
-                  {action.badge}
-                </motion.span>
-              )}
-            </AnimatePresence>
+            {action.badge && (
+              <span
+                className={`${action.badgeColor} text-xs px-3 py-1 rounded-full font-semibold`}>
+                {action.badge}
+              </span>
+            )}
           </div>
           <p
             className={`text-sm leading-relaxed ${
@@ -318,37 +255,20 @@ const QuickActionCard: React.FC<any> = ({ action, isDarkMode }) => {
             {action.description}
           </p>
         </div>
-      </motion.div>
+      </div>
 
       <Link to={action.link}>
-        <motion.button
-          whileHover={{
-            scale: 1.02,
-            boxShadow: "0 10px 30px rgba(59, 130, 246, 0.3)",
-          }}
-          whileTap={{ scale: 0.98 }}
-          className={`group/btn w-full flex items-center justify-center gap-2 ${action.btnColor} text-white font-bold px-6 py-4 rounded-2xl shadow-lg text-base transition-all duration-300 relative overflow-hidden`}
-          aria-label={action.title}>
-          {/* Button shine effect */}
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 -translate-x-full"
-            whileHover={{
-              translateX: "200%",
-              transition: { duration: 0.6 },
-            }}
-          />
-
+        <button
+          className={`group/btn w-full flex items-center justify-center gap-2 ${action.btnColor} text-white font-bold px-6 py-4 rounded-2xl shadow-lg text-base transition-all duration-300 hover:shadow-xl`}>
           <span className="relative z-10">{action.btnText}</span>
-          <motion.div whileHover={{ x: 4 }} transition={{ duration: 0.2 }}>
-            <ArrowRightIcon className="w-5 h-5 relative z-10" />
-          </motion.div>
-        </motion.button>
+          <ArrowRightIcon className="w-5 h-5 relative z-10 transition-transform duration-300 group-hover/btn:translate-x-1" />
+        </button>
       </Link>
     </motion.div>
   );
 };
 
-// Enhanced ProgressBar Component
+// ProgressBar Component - NO blinking animations
 const ProgressBar: React.FC<{
   percent: number;
   isDarkMode: boolean;
@@ -362,35 +282,212 @@ const ProgressBar: React.FC<{
         isDarkMode ? "bg-slate-800/50" : "bg-gray-100"
       }`}>
       <motion.div
-        initial={{ width: 0, opacity: 0 }}
-        animate={{
-          width: `${clampedPercent}%`,
-          opacity: 1,
-        }}
-        transition={{
-          duration: 1,
-          delay,
-          ease: [0.25, 0.1, 0.25, 1],
-        }}
-        className={`h-3 rounded-full relative overflow-hidden ${
+        initial={{ width: 0 }}
+        animate={{ width: `${clampedPercent}%` }}
+        transition={{ duration: 0.8, delay, ease: "easeOut" }}
+        className={`h-3 rounded-full ${
           isDarkMode
             ? "bg-gradient-to-r from-blue-500 to-cyan-400"
             : "bg-gradient-to-r from-blue-500 to-cyan-400"
-        }`}>
-        {/* Animated shine effect */}
-        <motion.div
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12"
-          animate={{
-            translateX: ["-100%", "200%"],
-            transition: {
-              duration: 2,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: delay + 1,
-            },
-          }}
+        }`}></motion.div>
+    </div>
+  );
+};
+
+// Add this CustomDropdown component after all your imports
+interface CustomDropdownProps {
+  label: string;
+  options: Array<{ id: string; name: string }>;
+  value: string | null;
+  onChange: (value: string) => void;
+  placeholder: string;
+  isDarkMode: boolean;
+  colorScheme: "blue" | "purple";
+}
+
+const CustomDropdown: React.FC<CustomDropdownProps> = ({
+  label,
+  options,
+  value,
+  onChange,
+  placeholder,
+  isDarkMode,
+  colorScheme,
+}) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+
+  const selectedOption = options.find((opt) => opt.id === value);
+
+  const colors = {
+    blue: {
+      dot: "bg-blue-500",
+      border: isDarkMode
+        ? "border-slate-600/50 hover:border-blue-500/50"
+        : "border-gray-300/50 hover:border-blue-400/50",
+      hover: isDarkMode ? "hover:bg-slate-700/70" : "hover:bg-blue-50",
+    },
+    purple: {
+      dot: "bg-purple-500",
+      border: isDarkMode
+        ? "border-slate-600/50 hover:border-purple-500/50"
+        : "border-gray-300/50 hover:border-purple-400/50",
+      hover: isDarkMode ? "hover:bg-slate-700/70" : "hover:bg-purple-50",
+    },
+  };
+
+  // UPDATED: Removed all scroll listeners, only keep click outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen]);
+
+  const handleSelect = (optionId: string) => {
+    onChange(optionId);
+    setIsOpen(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3" ref={dropdownRef}>
+      <div className="flex items-center gap-2 mb-2">
+        <div
+          className={`w-1.5 h-1.5 rounded-full ${
+            value ? "bg-green-500 animate-pulse" : "bg-gray-400"
+          }`}
         />
-      </motion.div>
+        <label
+          className={`text-sm font-semibold tracking-wide ${
+            isDarkMode ? "text-gray-200" : "text-gray-700"
+          }`}>
+          {label}
+        </label>
+      </div>
+
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          onKeyDown={handleKeyDown}
+          className={`w-full h-14 rounded-xl shadow-md backdrop-blur-xl border-2 transition-all duration-300 font-medium px-4 flex items-center justify-between ${
+            isDarkMode
+              ? `bg-slate-800/80 text-gray-100 ${colors[colorScheme].border} hover:bg-slate-700/80`
+              : `bg-white/90 text-gray-800 ${colors[colorScheme].border} hover:bg-white`
+          } ${isOpen ? "ring-2 ring-offset-2 ring-offset-transparent" : ""}`}>
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-2 h-2 rounded-full ${
+                value ? colors[colorScheme].dot : "bg-gray-400"
+              }`}
+            />
+            <span className={selectedOption ? "" : "text-gray-500"}>
+              {selectedOption ? selectedOption.name : placeholder}
+            </span>
+          </div>
+
+          <svg
+            className={`w-5 h-5 transition-transform duration-200 ${
+              isOpen ? "rotate-180" : ""
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </button>
+
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className={`absolute z-50 w-full mt-2 rounded-xl backdrop-blur-xl shadow-2xl border overflow-hidden ${
+                isDarkMode
+                  ? "bg-slate-800/95 text-gray-100 border-slate-700"
+                  : "bg-white/95 text-gray-900 border-gray-200"
+              }`}>
+              <div ref={menuRef} className="max-h-64 overflow-y-auto">
+                {options.length === 0 ? (
+                  <div className="py-8 px-4 text-center text-gray-500">
+                    No options available
+                  </div>
+                ) : (
+                  options.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => handleSelect(option.id)}
+                      className={`w-full py-3.5 px-4 cursor-pointer transition-colors duration-200 flex items-center gap-3 text-left ${
+                        colors[colorScheme].hover
+                      } ${
+                        option.id === value
+                          ? isDarkMode
+                            ? "bg-slate-700/50"
+                            : "bg-gray-100"
+                          : ""
+                      }`}>
+                      <div
+                        className={`w-2 h-2 rounded-full ${colors[colorScheme].dot}`}
+                      />
+                      <span className="font-medium flex-1">{option.name}</span>
+
+                      {option.id === value && (
+                        <svg
+                          className="w-5 h-5"
+                          fill="currentColor"
+                          viewBox="0 0 20 20">
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+
+              <div
+                className={`py-2 px-4 text-xs font-medium border-t ${
+                  isDarkMode
+                    ? "text-gray-400 border-slate-700"
+                    : "text-gray-500 border-gray-200"
+                }`}>
+                {options.length} option{options.length !== 1 ? "s" : ""}{" "}
+                available
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 };
@@ -399,7 +496,11 @@ const ProgressBar: React.FC<{
 const Dashboard: React.FC = () => {
   const dispatch = useAppDispatch();
   const { toast } = useToast();
-  const controls = useAnimation();
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [showHelpTooltip, setShowHelpTooltip] = useState(true);
+
+  // Get profile data from Redux
+  const { data: profileData } = useAppSelector((state) => state.profile);
 
   const {
     adAccounts,
@@ -411,28 +512,85 @@ const Dashboard: React.FC = () => {
     selectedCampaign,
     loading,
     lastUpdated,
+    facebookAuth,
   } = useAppSelector((state) => state.facebookAds);
+  const { hasSeenOnboarding, loading: onboardingLoading } = useAppSelector(
+    (state) => state.onboarding
+  );
 
+  // Local state
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [hasFetchedOnboarding, setHasFetchedOnboarding] = useState(false);
+
+  // Fetch onboarding status when component mounts
+  useEffect(() => {
+    if (!hasFetchedOnboarding) {
+      console.log("Dashboard: Fetching onboarding status...");
+      dispatch(fetchOnboardingStatus());
+      setHasFetchedOnboarding(true);
+    }
+  }, [dispatch, hasFetchedOnboarding]);
+
+  // Show onboarding modal based on backend data
+  useEffect(() => {
+    console.log("Dashboard onboarding check:", {
+      onboardingLoading,
+      hasSeenOnboarding,
+    });
+
+    // Wait for data to load
+    if (onboardingLoading) {
+      console.log("Still loading onboarding data...");
+      return;
+    }
+
+    // Check if user has seen onboarding
+    if (!hasSeenOnboarding) {
+      console.log("User has not seen onboarding, showing modal");
+      setShowOnboardingModal(true);
+    } else {
+      console.log("User has already seen onboarding");
+      setShowOnboardingModal(false);
+    }
+  }, [hasSeenOnboarding, onboardingLoading]);
+
+  // Handle onboarding completion
+  const handleCompleteOnboarding = useCallback(() => {
+    console.log("Dashboard: Completing onboarding and updating backend");
+    setShowOnboardingModal(false);
+
+    // Update backend
+    dispatch(updateOnboardingStatus({ hasSeenOnboarding: true }));
+  }, [dispatch]);
+
+  // Theme state - NO animated theme detection
   const [isDarkMode, setIsDarkMode] = React.useState(() =>
     typeof window !== "undefined"
       ? document.documentElement.classList.contains("dark")
       : false
   );
-  const token = localStorage.getItem("FB_ACCESS_TOKEN");
-  const hasToken = Boolean(token);
 
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
-  const router = useNavigate();
-
-  // Theme synchronization with enhanced detection
   useEffect(() => {
-    const classList = document.documentElement.classList;
-    setIsDarkMode(classList.contains("dark"));
+    const authToken = localStorage.getItem("token");
+    if (authToken) {
+      // 🔥 NEW: Check Facebook status
+      dispatch(checkFacebookStatus());
+    }
+  }, [dispatch]);
 
-    const observer = new MutationObserver(() =>
-      setIsDarkMode(classList.contains("dark"))
-    );
+  // Show tooltip on mount
+  useEffect(() => {
+    setShowHelpTooltip(true);
+  }, []);
+  // Simple theme detection without animation
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    };
 
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["class"],
@@ -441,112 +599,35 @@ const Dashboard: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Add this function in your dashboard component
-  const exchangeForLongLivedToken = async (shortLivedToken: string) => {
-    try {
-      const FB_APP_ID = import.meta.env.VITE_FACEBOOK_APP_ID;
-      const FB_APP_SECRET = import.meta.env.VITE_FB_APP_SECRET;
+  // Facebook connection check
+  // NEW - Use Facebook auth state
+  const isConnected =
+    facebookAuth.isConnected && facebookAuth.status?.facebook_token_valid;
+  console.log(isConnected, "isconnected=>>>>>>>>>>>>");
+  const hasFacebookConnection = isConnected;
 
-      const response = await fetch(
-        `https://graph.facebook.com/oauth/access_token?` +
-          `client_id=${FB_APP_ID}&` +
-          `client_secret=${FB_APP_SECRET}&` +
-          `grant_type=fb_exchange_token&` +
-          `fb_exchange_token=${shortLivedToken}`
-      );
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
 
-      const data = await response.json();
+  // Check if user has seen onboarding
+  // useEffect(() => {
+  //   const hasSeenOnboarding = localStorage.getItem(
+  //     "interestMinerOnboardingCompleted"
+  //   );
+  //   if (!hasSeenOnboarding) {
+  //     setShowOnboarding(true);
+  //   }
+  // }, []);
 
-      if (data.access_token) {
-        console.log("✅ Exchanged for long-lived token (60 days)");
-        return data.access_token;
-      } else {
-        console.error("❌ Token exchange failed:", data);
-        return shortLivedToken; // Return original if exchange fails
-      }
-    } catch (error) {
-      console.error("❌ Token exchange error:", error);
-      return shortLivedToken; // Return original if exchange fails
-    }
-  };
+  const router = useNavigate();
 
-  // **UPDATED: Your existing useEffect with token exchange**
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash && hash.includes("access_token")) {
-      const hashParams = new URLSearchParams(hash.substring(1));
-      const shortLivedToken = hashParams.get("access_token");
-
-      if (shortLivedToken) {
-        console.log(
-          "📝 Short-lived token received, exchanging for long-lived..."
-        );
-
-        // **NEW: Exchange for long-lived token**
-        const processToken = async () => {
-          try {
-            const longLivedToken = await exchangeForLongLivedToken(
-              shortLivedToken
-            );
-
-            // Store long-lived token with timestamp
-            localStorage.setItem("FB_ACCESS_TOKEN", longLivedToken);
-            localStorage.setItem("FB_TOKEN_TIMESTAMP", Date.now().toString());
-
-            // Clear URL hash
-            window.history.replaceState(
-              {},
-              document.title,
-              window.location.pathname
-            );
-
-            // Fetch ad accounts with long-lived token
-            dispatch(fetchAdAccounts());
-
-            // Success animation
-            controls.start({
-              scale: [1, 1.05, 1],
-              transition: { duration: 0.5 },
-            });
-
-            console.log("✅ Long-lived token stored and ad accounts fetched");
-          } catch (error) {
-            console.error("❌ Error processing token:", error);
-            // Fallback: use short-lived token
-            localStorage.setItem("FB_ACCESS_TOKEN", shortLivedToken);
-            dispatch(fetchAdAccounts());
-          }
-        };
-
-        processToken();
-      }
-    } else {
-      // 🔥 AUTO-FETCH: Automatically fetch ad accounts if token exists
-      const existingToken = localStorage.getItem("FB_ACCESS_TOKEN");
-      if (existingToken && adAccounts.length === 0) {
-        // **NEW: Check token expiry before using**
-        const tokenTimestamp = localStorage.getItem("FB_TOKEN_TIMESTAMP");
-        if (tokenTimestamp) {
-          const tokenAge = Date.now() - parseInt(tokenTimestamp);
-          const daysOld = tokenAge / (1000 * 60 * 60 * 24);
-
-          if (daysOld > 60) {
-            console.log("🚨 Token expired, please reconnect");
-            localStorage.removeItem("FB_ACCESS_TOKEN");
-            localStorage.removeItem("FB_TOKEN_TIMESTAMP");
-            // Redirect to connection page or show reconnect UI
-            return;
-          } else if (daysOld > 50) {
-            console.log("⚠️ Token expires soon, consider refreshing");
-          }
-        }
-
-        dispatch(fetchAdAccounts());
-      }
+    const authToken = localStorage.getItem("token");
+    if (authToken && hasFacebookConnection && adAccounts.length === 0) {
+      console.log("🔄 Fetching ad accounts...");
+      dispatch(fetchAdAccounts());
     }
-  }, [dispatch, adAccounts.length, controls]);
+  }, [dispatch, hasFacebookConnection, adAccounts.length]);
 
-  // 🔥 AUTO-SELECT: First ad account when accounts are loaded
   useEffect(() => {
     if (adAccounts.length > 0 && !selectedAccount) {
       dispatch(setSelectedAccount(adAccounts[0].id));
@@ -557,14 +638,12 @@ const Dashboard: React.FC = () => {
     }
   }, [adAccounts, selectedAccount, dispatch, toast]);
 
-  // 🔥 AUTO-FETCH: Campaigns when account is selected
   useEffect(() => {
     if (selectedAccount) {
       dispatch(fetchCampaigns(selectedAccount));
     }
   }, [selectedAccount, dispatch]);
 
-  // 🔥 AUTO-SELECT: First campaign when campaigns are loaded
   useEffect(() => {
     if (campaigns.length > 0 && !selectedCampaign && selectedAccount) {
       dispatch(setSelectedCampaign(campaigns[0].id));
@@ -575,41 +654,43 @@ const Dashboard: React.FC = () => {
     }
   }, [campaigns, selectedCampaign, selectedAccount, dispatch, toast]);
 
-  // 🔥 AUTO-FETCH: Campaign insights when campaign is selected
   useEffect(() => {
     if (selectedCampaign) {
       dispatch(fetchCampaignInsights(selectedCampaign));
     }
   }, [selectedCampaign, dispatch]);
 
-  // 🔥 AUTO-FETCH: Overall insights when account and campaigns are ready
   useEffect(() => {
     if (selectedAccount && campaigns.length > 0) {
       dispatch(fetchInsights(false));
     }
   }, [selectedAccount, campaigns.length, dispatch]);
 
-  // Enhanced callbacks
+  // All your existing handlers remain the same...
   const handleAccountChange = useCallback(
     (accountId: string) => {
       dispatch(setSelectedAccount(accountId));
-      dispatch(setSelectedCampaign(""));
+      if (accountId && hasFacebookConnection) {
+        dispatch(fetchCampaigns(accountId));
+        dispatch(fetchInsights(false));
+      }
       toast({
         title: "Loading Data",
         description: "Fetching campaigns and insights...",
       });
     },
-    [dispatch, toast]
+    [dispatch, hasFacebookConnection, toast]
   );
 
   const handleCampaignChange = useCallback(
     (campaignId: string) => {
+      if (!hasFacebookConnection) return;
       dispatch(setSelectedCampaign(campaignId));
       if (campaignId) {
         dispatch(fetchCampaignInsights(campaignId));
       }
     },
-    [dispatch]
+    [dispatch, hasFacebookConnection]
   );
 
   const handleRefresh = useCallback(async () => {
@@ -638,7 +719,7 @@ const Dashboard: React.FC = () => {
     }
   }, [selectedAccount, adAccounts.length, dispatch, toast]);
 
-  // Memoized calculations
+  // All your existing data calculations remain the same...
   const dashboardStats = useMemo(
     () => ({
       connectedAccounts: adAccounts.length,
@@ -649,15 +730,6 @@ const Dashboard: React.FC = () => {
     [adAccounts.length, campaigns, campaignInsightstotal.length]
   );
 
-  // const formatCurrency = (amount: number) =>
-  //   new Intl.NumberFormat("en-IN", {
-  //     style: "currency",
-  //     currency: "INR",
-  //     minimumFractionDigits: 0,
-  //     maximumFractionDigits: 0,
-  //   }).format(amount);
-
-  // Enhanced theme configuration
   const themeConfig = useMemo(
     () => ({
       background: isDarkMode
@@ -675,7 +747,6 @@ const Dashboard: React.FC = () => {
     [isDarkMode]
   );
 
-  // Enhanced stat cards configuration
   const statCards = useMemo(
     () => [
       {
@@ -733,7 +804,6 @@ const Dashboard: React.FC = () => {
     [dashboardStats, isDarkMode, loading]
   );
 
-  // Enhanced quick actions
   const quickActions = useMemo(
     () => [
       {
@@ -766,7 +836,6 @@ const Dashboard: React.FC = () => {
     [aggregatedStats, isDarkMode]
   );
 
-  // Enhanced recent activity
   const recentActivity = useMemo(
     () => [
       {
@@ -805,423 +874,153 @@ const Dashboard: React.FC = () => {
 
   return (
     <>
-      {!hasToken && (
-        <>
-          {" "}
-          <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 flex items-center justify-center relative overflow-hidden">
-            {/* Background Elements */}
-            <div className="absolute inset-0 overflow-hidden">
-              <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-300/20 dark:bg-blue-600/10 rounded-full blur-3xl animate-pulse"></div>
-              <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-300/20 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-200/10 dark:bg-purple-600/5 rounded-full blur-3xl animate-pulse delay-500"></div>
-            </div>
+      <OnboardingModal
+        isOpen={showOnboardingModal && !onboardingLoading}
+        onClose={handleCompleteOnboarding}
+      />
 
-            {/* Floating Icons */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              <motion.div
-                animate={{
-                  y: [0, -20, 0],
-                  rotate: [0, 5, 0],
-                }}
-                transition={{
-                  duration: 6,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-                className="absolute top-20 left-20 text-blue-400/30 dark:text-blue-500/20">
-                <ChartBarIcon className="w-8 h-8" />
-              </motion.div>
-              <motion.div
-                animate={{
-                  y: [0, 15, 0],
-                  rotate: [0, -5, 0],
-                }}
-                transition={{
-                  duration: 8,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  delay: 1,
-                }}
-                className="absolute top-40 right-32 text-indigo-400/30 dark:text-indigo-500/20">
-                <EyeIcon className="w-6 h-6" />
-              </motion.div>
-              <motion.div
-                animate={{
-                  y: [0, -25, 0],
-                  x: [0, 10, 0],
-                }}
-                transition={{
-                  duration: 10,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  delay: 2,
-                }}
-                className="absolute bottom-32 left-32 text-purple-400/30 dark:text-purple-500/20">
-                <CursorArrowRaysIcon className="w-7 h-7" />
-              </motion.div>
-              <motion.div
-                animate={{
-                  y: [0, 20, 0],
-                  rotate: [0, 10, 0],
-                }}
-                transition={{
-                  duration: 7,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  delay: 0.5,
-                }}
-                className="absolute bottom-20 right-20 text-blue-400/30 dark:text-blue-500/20">
-                <UsersIcon className="w-6 h-6" />
-              </motion.div>
-            </div>
-
-            {/* Main Content */}
-            <motion.div
-              initial={{ opacity: 0, y: 40, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{
-                duration: 0.8,
-                ease: "easeOut",
-                type: "spring",
-                stiffness: 100,
-              }}
-              className="relative z-10 text-center max-w-4xl mx-auto p-8">
-              {/* Glass Card Container */}
-              <div className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/30 p-10 relative overflow-hidden">
-                {/* Subtle gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-indigo-500/5 dark:from-blue-400/10 dark:to-indigo-400/10 rounded-3xl"></div>
-
-                {/* Content */}
-                <div className="relative z-10">
-                  {/* Title */}
-                  <motion.h2
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.5 }}
-                    className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 dark:from-white dark:via-gray-100 dark:to-white bg-clip-text text-transparent mb-3">
-                    Authentication Required
-                  </motion.h2>
-
-                  {/* Subtitle */}
-                  <motion.p
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.6 }}
-                    className="text-gray-600 dark:text-gray-300 text-lg mb-8 leading-relaxed">
-                    Connect your Meta Business account to unlock powerful
-                    analytics and insights for your campaigns.
-                  </motion.p>
-
-                  {/* Features List */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: 0.7 }}
-                    className="grid grid-cols-1 gap-4 mb-8">
-                    <div className="flex items-center space-x-3 p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-xl border border-blue-100/50 dark:border-blue-800/30">
-                      <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-400/10 rounded-lg flex items-center justify-center">
-                        <ChartBarIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Real-time Campaign Analytics
-                      </span>
-                    </div>
-
-                    <div className="flex items-center space-x-3 p-3 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100/50 dark:border-indigo-800/30">
-                      <div className="w-8 h-8 bg-indigo-500/10 dark:bg-indigo-400/10 rounded-lg flex items-center justify-center">
-                        <EyeIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                      </div>
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Performance Insights & Metrics
-                      </span>
-                    </div>
-
-                    <div className="flex items-center space-x-3 p-3 bg-purple-50/50 dark:bg-purple-900/20 rounded-xl border border-purple-100/50 dark:border-purple-800/30">
-                      <div className="w-8 h-8 bg-purple-500/10 dark:bg-purple-400/10 rounded-lg flex items-center justify-center">
-                        <SparklesIcon className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                      </div>
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        AI-Powered Recommendations
-                      </span>
-                    </div>
-                  </motion.div>
-
-                  {/* CTA Button */}
-                  <motion.button
-                    initial={{ opacity: 0, y: 30, scale: 0.9 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ duration: 0.8, delay: 0.9 }}
-                    whileHover={{
-                      scale: 1.05,
-                      boxShadow:
-                        "0 20px 25px -5px rgba(99, 102, 241, 0.3), 0 10px 10px -5px rgba(99, 102, 241, 0.1)",
-                    }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => router("/meta-campaign")}
-                    className="group relative w-full px-8 py-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-semibold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden">
-                    {/* Button shimmer effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
-
-                    {/* Button content */}
-                    <div className="relative flex items-center justify-center space-x-3">
-                      <svg
-                        className="w-5 h-5"
-                        viewBox="0 0 24 24"
-                        fill="currentColor">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                      </svg>
-                      <span className="text-lg">Connect Meta Account</span>
-                      <motion.div
-                        animate={{ x: [0, 4, 0] }}
-                        transition={{
-                          duration: 1.5,
-                          repeat: Infinity,
-                          ease: "easeInOut",
-                        }}
-                        className="ml-1">
-                        →
-                      </motion.div>
-                    </div>
-                  </motion.button>
-
-                  {/* Security Notice */}
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.6, delay: 1.1 }}
-                    className="mt-6 p-4 bg-gray-50/50 dark:bg-gray-700/30 rounded-xl border border-gray-200/50 dark:border-gray-600/30">
-                    <div className="flex items-start space-x-3">
-                      <div className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0">
-                        <svg
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                          />
-                        </svg>
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Secure & Private
-                        </p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                          We only access your campaign performance data. Your
-                          ads and settings remain completely under your control.
-                        </p>
-                      </div>
-                    </div>
-                  </motion.div>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Decorative elements */}
-            <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
-          </div>
-        </>
-      )}
       <div className="relative">
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={containerVariants}
-          className={`min-h-screen transition-all duration-500 ${themeConfig.background} ${themeConfig.text}`}>
-          {/* Enhanced background effects */}
-          <div className="fixed inset-0 overflow-hidden pointer-events-none">
-            <motion.div
-              animate={{
-                x: [0, 100, 0],
-                y: [0, -100, 0],
-                rotate: [0, 180, 360],
-              }}
-              transition={{
-                duration: 20,
-                repeat: Infinity,
-                ease: "linear",
-              }}
-              className={`absolute top-1/4 left-1/4 w-64 h-64 rounded-full opacity-5 ${
-                isDarkMode ? "bg-blue-500" : "bg-blue-300"
-              } blur-3xl`}
-            />
-            <motion.div
-              animate={{
-                x: [0, -150, 0],
-                y: [0, 100, 0],
-                rotate: [360, 180, 0],
-              }}
-              transition={{
-                duration: 25,
-                repeat: Infinity,
-                ease: "linear",
-              }}
-              className={`absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full opacity-5 ${
-                isDarkMode ? "bg-purple-500" : "bg-purple-300"
-              } blur-3xl`}
-            />
-          </div>
-
-          <div
-            className={`${
-              !hasToken
-                ? "blur-sm pointer-events-none p-6"
-                : "min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6"
-            }`}>
-            {/* Enhanced Header */}
-            <motion.div variants={fadeInUp} className="mb-8">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <motion.h1
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.6 }}
-                    className={`text-4xl font-black tracking-tight mb-2 bg-gradient-to-r ${
-                      isDarkMode
-                        ? "from-blue-400 via-purple-400 to-cyan-400"
-                        : "from-blue-600 via-purple-600 to-cyan-600"
-                    } bg-clip-text text-transparent`}>
-                    Welcome back!
-                    <motion.span
-                      animate={{ rotate: [0, 14, -8, 14, -4, 10, 0] }}
-                      transition={{
-                        duration: 2,
-                        repeat: Infinity,
-                        repeatDelay: 3,
-                      }}
-                      className="inline-block ml-2">
-                      👋
-                    </motion.span>
-                  </motion.h1>
-
-                  <motion.p
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.2 }}
-                    className={`text-lg ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    } max-w-2xl leading-relaxed`}>
-                    Your comprehensive dashboard for Meta Ads optimization and
-                    AI-powered audience insights.
-                  </motion.p>
-                </div>
-
-                {/* Enhanced refresh button */}
-                <motion.button
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold shadow-lg transition-all duration-300 ${
+        <div
+          className={`min-h-screen transition-all duration-300 ${themeConfig.background} ${themeConfig.text}`}>
+          <div className="min-h-screen p-6">
+            {!hasFacebookConnection ? (
+              <>
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className={`relative overflow-hidden rounded-2xl p-6 mb-8 ${
                     isDarkMode
-                      ? "bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 text-blue-400 hover:bg-slate-700/50"
-                      : "bg-white/80 backdrop-blur-xl border border-gray-200/50 text-blue-600 hover:bg-white"
+                      ? "bg-slate-800/50 border-b-blue-500 border border-slate-700/50"
+                      : "bg-white border border-b-blue-500/30 border-gray-200/50"
                   }`}>
-                  <motion.div
-                    animate={isRefreshing ? { rotate: 360 } : { rotate: 0 }}
-                    transition={{
-                      duration: 1,
-                      repeat: isRefreshing ? Infinity : 0,
-                      ease: "linear",
-                    }}>
-                    <ArrowPathIcon className="w-5 h-5" />
-                  </motion.div>
-                  {isRefreshing ? "Refreshing..." : "Refresh Data"}
-                </motion.button>
-                {TokenStatus()}
-              </div>
+                  <div className="flex justify-center mb-6">
+                    <div className="text-center">
+                      <h1
+                        className={`text-4xl font-black tracking-tight mb-2 bg-gradient-to-r ${
+                          isDarkMode
+                            ? "from-blue-400 via-purple-400 to-cyan-400"
+                            : "from-blue-600 via-purple-600 to-cyan-600"
+                        } bg-clip-text text-transparent`}>
+                        Welcome back!
+                      </h1>
 
-              {/* Enhanced selectors */}
-              <div className="flex gap-4 items-center">
-                <AnimatePresence>
-                  {adAccounts.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}>
-                      <Select
+                      <p
+                        className={`text-lg ${
+                          isDarkMode ? "text-gray-300" : "text-gray-600"
+                        } max-w-2xl leading-relaxed`}>
+                        Your comprehensive dashboard for Meta Ads optimization
+                        and AI-powered audience insights.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+                <FacebookConnectionBanner
+                  isDarkMode={isDarkMode}
+                  onConnect={() => router("/meta-campaign")}
+                />
+              </>
+            ) : (
+              <>
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className={`relative overflow-hidden rounded-2xl p-6 mb-8 ${
+                    isDarkMode
+                      ? "bg-slate-800/50 border-b-blue-500 border border-slate-700/50"
+                      : "bg-white border border-b-blue-500/30 border-gray-200/50"
+                  }`}>
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h1
+                        className={`text-4xl font-black tracking-tight mb-2 bg-gradient-to-r ${
+                          isDarkMode
+                            ? "from-blue-400 via-purple-400 to-cyan-400"
+                            : "from-blue-600 via-purple-600 to-cyan-600"
+                        } bg-clip-text text-transparent`}>
+                        Welcome back! 👋
+                      </h1>
+
+                      <p
+                        className={`text-lg ${
+                          isDarkMode ? "text-gray-300" : "text-gray-600"
+                        } max-w-2xl leading-relaxed`}>
+                        Your comprehensive dashboard for Meta Ads optimization
+                        and AI-powered audience insights.
+                      </p>
+                    </div>
+
+                    <div className="flex gap-4 items-center">
+                      <button
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold shadow-lg transition-all duration-300 ${
+                          isDarkMode
+                            ? "bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 text-blue-400 hover:bg-slate-700/50"
+                            : "bg-white/80 backdrop-blur-xl border border-gray-200/50 text-blue-600 hover:bg-white"
+                        }`}>
+                        <ArrowPathIcon
+                          className={`w-5 h-5 ${
+                            isRefreshing ? "animate-spin" : ""
+                          }`}
+                        />
+                        {isRefreshing ? "Refreshing..." : "Refresh Data"}
+                      </button>
+                      <TokenStatus isDarkMode={isDarkMode} />
+                    </div>
+                  </div>
+                </motion.div>
+                {/* Selectors */}
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className={`relative rounded-2xl p-6 mb-8 ${
+                    isDarkMode
+                      ? "bg-slate-800/50 border-b-blue-500 border border-slate-700/50"
+                      : "bg-white border border-b-blue-500/30 border-gray-200/50"
+                  }`}>
+                  {/* Content */}
+                  <div className="relative grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Ad Account Selector */}
+                    {adAccounts.length > 0 && (
+                      <CustomDropdown
+                        label="Ad Account"
+                        options={adAccounts.map((acc) => ({
+                          id: acc.id,
+                          name: acc.name,
+                        }))}
                         value={selectedAccount}
-                        onValueChange={handleAccountChange}>
-                        <SelectTrigger
-                          className={`w-[280px] h-12 rounded-2xl shadow-lg backdrop-blur-xl border transition-all duration-300 ${
-                            isDarkMode
-                              ? "bg-slate-800/50 text-gray-100 border-slate-700/50 hover:bg-slate-700/50"
-                              : "bg-white/80 text-gray-700 border-gray-200/50 hover:bg-white"
-                          }`}>
-                          <span className="font-medium">
-                            {adAccounts.find(
-                              (acc) => acc.id === selectedAccount
-                            )?.name || "Select Ad Account"}
-                          </span>
-                        </SelectTrigger>
-                        <SelectContent
-                          className={`rounded-2xl backdrop-blur-xl ${
-                            isDarkMode
-                              ? "bg-slate-800/95 text-gray-100"
-                              : "bg-white/95 text-gray-900"
-                          }`}>
-                          {adAccounts.map((acc) => (
-                            <SelectItem
-                              key={acc.id}
-                              value={acc.id}
-                              className="py-3">
-                              {acc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                        onChange={handleAccountChange}
+                        placeholder="Choose an ad account"
+                        isDarkMode={isDarkMode}
+                        colorScheme="blue"
+                      />
+                    )}
 
-                <AnimatePresence>
-                  {campaigns.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}>
-                      <Select
+                    {/* Campaign Selector */}
+                    {campaigns.length > 0 && (
+                      <CustomDropdown
+                        label="Campaign"
+                        options={campaigns.map((c) => ({
+                          id: c.id,
+                          name: c.name,
+                        }))}
                         value={selectedCampaign}
-                        onValueChange={handleCampaignChange}>
-                        <SelectTrigger
-                          className={`w-[280px] h-12 rounded-2xl shadow-lg backdrop-blur-xl border transition-all duration-300 ${
-                            isDarkMode
-                              ? "bg-slate-800/50 text-gray-100 border-slate-700/50 hover:bg-slate-700/50"
-                              : "bg-white/80 text-gray-700 border-gray-200/50 hover:bg-white"
-                          }`}>
-                          <span className="font-medium">
-                            {campaigns.find((c) => c.id === selectedCampaign)
-                              ?.name || "Select Campaign"}
-                          </span>
-                        </SelectTrigger>
-                        <SelectContent
-                          className={`rounded-2xl backdrop-blur-xl ${
-                            isDarkMode
-                              ? "bg-slate-800/95 text-gray-100"
-                              : "bg-white/95 text-gray-900"
-                          }`}>
-                          {campaigns.map((c) => (
-                            <SelectItem
-                              key={c.id}
-                              value={c.id}
-                              className="py-3">
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </motion.div>
+                        onChange={handleCampaignChange}
+                        placeholder="Choose a campaign"
+                        isDarkMode={isDarkMode}
+                        colorScheme="purple"
+                      />
+                    )}
+                  </div>
+                </motion.div>
+              </>
+            )}
 
-            {/* Enhanced Stats Grid */}
-            <motion.div
-              variants={fadeInUp}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               {statCards.map((card, index) => (
                 <StatCard
                   key={card.title}
@@ -1230,12 +1029,10 @@ const Dashboard: React.FC = () => {
                   index={index}
                 />
               ))}
-            </motion.div>
+            </div>
 
-            {/* Enhanced Quick Actions */}
-            <motion.div
-              variants={fadeInUp}
-              className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Quick Actions */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
               {quickActions.map((action) => (
                 <QuickActionCard
                   key={action.title}
@@ -1243,24 +1040,15 @@ const Dashboard: React.FC = () => {
                   isDarkMode={isDarkMode}
                 />
               ))}
-            </motion.div>
+            </div>
 
-            {/* Enhanced Main Content Grid */}
-            <motion.div
-              variants={fadeInUp}
-              className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Enhanced Recent Activity */}
-              <motion.div
-                whileHover={{ y: -4 }}
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Recent Activity */}
+              <div
                 className={`rounded-3xl p-8 backdrop-blur-xl border transition-all duration-300 ${themeConfig.cardBg} ${themeConfig.border} ${themeConfig.shadow}`}>
                 <div className="flex items-center gap-3 mb-6">
-                  <motion.div
-                    animate={{ rotate: [0, 360] }}
-                    transition={{
-                      duration: 20,
-                      repeat: Infinity,
-                      ease: "linear",
-                    }}
+                  <div
                     className={`p-2 rounded-xl ${
                       isDarkMode ? "bg-blue-500/20" : "bg-blue-100"
                     }`}>
@@ -1269,7 +1057,7 @@ const Dashboard: React.FC = () => {
                         isDarkMode ? "text-blue-400" : "text-blue-600"
                       }`}
                     />
-                  </motion.div>
+                  </div>
                   <h2 className="text-xl font-bold">Recent Activity</h2>
                 </div>
 
@@ -1282,18 +1070,14 @@ const Dashboard: React.FC = () => {
 
                 <div className="space-y-4">
                   {recentActivity.map((activity, index) => (
-                    <motion.div
+                    <div
                       key={index}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
                       className={`flex items-start gap-4 p-4 rounded-2xl backdrop-blur-sm transition-all duration-300 ${
                         isDarkMode
                           ? "bg-slate-800/30 hover:bg-slate-800/50"
                           : "bg-gray-50/50 hover:bg-gray-100/50"
                       }`}>
-                      <motion.div
-                        whileHover={{ scale: 1.1, rotate: 5 }}
+                      <div
                         className={`p-2 rounded-xl ${
                           activity.status === "success"
                             ? isDarkMode
@@ -1308,7 +1092,7 @@ const Dashboard: React.FC = () => {
                             : "bg-blue-100"
                         }`}>
                         {activity.icon}
-                      </motion.div>
+                      </div>
 
                       <div className="flex-1 min-w-0">
                         <p
@@ -1324,19 +1108,16 @@ const Dashboard: React.FC = () => {
                           {activity.time}
                         </p>
                       </div>
-                    </motion.div>
+                    </div>
                   ))}
                 </div>
-              </motion.div>
+              </div>
 
-              {/* Enhanced Account Overview */}
-              <motion.div
-                whileHover={{ y: -4 }}
+              {/* Account Overview */}
+              <div
                 className={`rounded-3xl p-8 backdrop-blur-xl border transition-all duration-300 ${themeConfig.cardBg} ${themeConfig.border} ${themeConfig.shadow}`}>
                 <div className="flex items-center gap-3 mb-6">
-                  <motion.div
-                    animate={{ scale: [1, 1.05, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
+                  <div
                     className={`p-2 rounded-xl ${
                       isDarkMode ? "bg-purple-500/20" : "bg-purple-100"
                     }`}>
@@ -1345,7 +1126,7 @@ const Dashboard: React.FC = () => {
                         isDarkMode ? "text-purple-400" : "text-purple-600"
                       }`}
                     />
-                  </motion.div>
+                  </div>
                   <h2 className="text-xl font-bold">Account Overview</h2>
                 </div>
 
@@ -1365,13 +1146,9 @@ const Dashboard: React.FC = () => {
                         }`}>
                         Connected Accounts
                       </span>
-                      <motion.span
-                        key={dashboardStats.connectedAccounts}
-                        initial={{ scale: 1.2, color: "#10b981" }}
-                        animate={{ scale: 1, color: "inherit" }}
-                        className="font-bold text-lg">
+                      <span className="font-bold text-lg">
                         {dashboardStats.connectedAccounts}
-                      </motion.span>
+                      </span>
                     </div>
                     <ProgressBar
                       percent={
@@ -1391,14 +1168,10 @@ const Dashboard: React.FC = () => {
                         }`}>
                         Active Campaigns
                       </span>
-                      <motion.span
-                        key={dashboardStats.activeCampaigns}
-                        initial={{ scale: 1.2, color: "#8b5cf6" }}
-                        animate={{ scale: 1, color: "inherit" }}
-                        className="font-bold text-lg">
+                      <span className="font-bold text-lg">
                         {dashboardStats.activeCampaigns} /{" "}
                         {dashboardStats.totalCampaigns}
-                      </motion.span>
+                      </span>
                     </div>
                     <ProgressBar
                       percent={
@@ -1421,13 +1194,9 @@ const Dashboard: React.FC = () => {
                         }`}>
                         Available Insights
                       </span>
-                      <motion.span
-                        key={dashboardStats.dataInsights}
-                        initial={{ scale: 1.2, color: "#06b6d4" }}
-                        animate={{ scale: 1, color: "inherit" }}
-                        className="font-bold text-lg">
+                      <span className="font-bold text-lg">
                         {dashboardStats.dataInsights}
-                      </motion.span>
+                      </span>
                     </div>
                     <ProgressBar
                       percent={Math.min(dashboardStats.dataInsights, 20) * 5}
@@ -1437,25 +1206,34 @@ const Dashboard: React.FC = () => {
                   </div>
                 </div>
 
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.8 }}
-                  className="mt-8 pt-6 border-t border-gray-200/10 flex items-center justify-between">
+                <div className="mt-8 pt-6 border-t border-gray-200/10 flex items-center justify-between">
                   <Link to="/analytics">
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-2xl shadow-lg transition-all duration-300">
+                    <button className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl">
                       View Full Analytics
-                    </motion.button>
+                    </button>
                   </Link>
-                </motion.div>
-              </motion.div>
-            </motion.div>
+                </div>
+              </div>
+            </div>
           </div>
-        </motion.div>
+        </div>
+        <HelpTooltip
+          show={showHelpTooltip}
+          message="How it works"
+          onClose={() => setShowHelpTooltip(false)}
+        />
+        <FloatingHelpButton
+          onClick={() => setIsHelpModalOpen(true)}
+          help="Dashboard Help"
+        />
       </div>
+
+      {/* Add these components at the end, just before the closing </div> */}
+
+      <DashboardHelpModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
+      />
     </>
   );
 };

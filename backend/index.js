@@ -3,6 +3,8 @@ const app = express();
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const router = require("./routes/index");
+const couponRoutes = require("./routes/couponRoutes");
+
 require("dotenv").config();
 
 const {
@@ -26,11 +28,11 @@ app.use(bodyParser.json());
 
 // Routes
 app.use("/", router);
-app.use("/facebook", require("./routes/facebookRoutes"));
 app.use("/api/adaccounts", require("./routes/adAccounts"));
 app.use("/api/campaigns", require("./routes/campaigns"));
 app.use("/api/insights", require("./routes/insights"));
-
+app.use("/api/coupons", couponRoutes);
+app.use("/test", require("./routes/test"));
 // Start server
 const PORT = process.env.PORT || 1000;
 app.listen(PORT, async () => {

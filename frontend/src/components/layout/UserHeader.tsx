@@ -60,6 +60,7 @@ export default function UserHeader({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  // console.log(userData, "this is userdata=>>>>>>>>>>>>>>");
   // Dark mode toggle function
   const toggleTheme = () => {
     const newTheme = !isDarkMode;

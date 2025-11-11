@@ -10,6 +10,46 @@ export interface AdAccount {
   spend_cap: string;
 }
 
+// Add these new interfaces at the top of your facebookAdsSlice.ts
+export interface FacebookConnection {
+  id: number;
+  user_id: number;
+  fb_user_id: string;
+  fb_access_token: string;
+  fb_token_updated_at: string;
+  fb_token_expires_in: number;
+  is_active: boolean;
+  is_primary: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FacebookStatus {
+  facebook_connected: boolean;
+  facebook_token_valid: boolean;
+  total_connections: number;
+  primary_connection: FacebookConnection | null;
+  all_connections: FacebookConnection[];
+  user_profile: {
+    id: number;
+    uuid: string;
+    name: string;
+    email: string;
+    avatar_path: string | null;
+    account_status: string;
+  };
+}
+
+export interface FacebookAuthState {
+  isConnected: boolean;
+  isLoading: boolean;
+  status: FacebookStatus | null;
+  connections: FacebookConnection[];
+  primaryConnection: FacebookConnection | null;
+  error: string | null;
+}
+
+
 export interface Campaign {
   id: string;
   name: string;
@@ -183,10 +223,11 @@ interface FacebookAdsState {
   initialLoading: boolean;
   showModal: boolean;
   showCustomDatePicker: boolean;
-  showAnalyticsModal: boolean;
   selectedCampaignForModal: Campaign | null;
   error: string | null;
   lastUpdated: string | null;
+
+  facebookAuth: FacebookAuthState;
 
   // Your existing AnalyticsPage fields
   campaignAnalysis: Campaign[];
@@ -212,7 +253,7 @@ interface FacebookAdsState {
 
 
 // ===== Helpers =====
-const getAccessToken = () => localStorage.getItem("FB_ACCESS_TOKEN");
+const getAccessToken = () => localStorage.getItem("token");
 
 const calculateAggregatedStats = (insights: InsightData[]): AggregatedStats | null => {
   if (!insights.length) return null;
@@ -315,7 +356,6 @@ const initialState: FacebookAdsState = {
   initialLoading: true,
   showModal: false,
   showCustomDatePicker: false,
-  showAnalyticsModal: false,
   selectedCampaignForModal: null,
   error: null,
   lastUpdated: null,
@@ -326,6 +366,14 @@ const initialState: FacebookAdsState = {
   overallTotals: null,
   loadingCampaigns: false,
   loadingTotals: false,
+  facebookAuth: {
+    isConnected: false,
+    isLoading: false,
+    status: null,
+    connections: [],
+    primaryConnection: null,
+    error: null,
+  },
 
   // 🔥 NEW: Additional campaign categories
   excellentCampaigns: [],
@@ -335,6 +383,112 @@ const initialState: FacebookAdsState = {
   insightsCache: {},
   insightsLastUpdated: {},
 };
+
+
+// Check Facebook connection status
+export const checkFacebookStatus = createAsyncThunk(
+  "facebookAds/checkFacebookStatus",
+  async (_, { rejectWithValue }) => {
+    const token = getAccessToken();
+    if (!token) return rejectWithValue("No access token found");
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_INTEREST_MINER_API_URL}/api/facebook/status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const data = await res.json();
+      return data.data; // Returns FacebookStatus
+    } catch (err: any) {
+      return rejectWithValue(err.message || "Failed to check Facebook status");
+    }
+  }
+);
+
+// Initiate Facebook login
+export const initiateFacebookLogin = createAsyncThunk(
+  "facebookAds/initiateFacebookLogin",
+  async (_, { rejectWithValue }) => {
+    const token = getAccessToken();
+    if (!token) return rejectWithValue("No access token found");
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_INTEREST_MINER_API_URL}/api/facebook/login`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const data = await res.json();
+
+      // Redirect to Facebook OAuth URL
+      window.location.href = data.data.authUrl;
+
+      return data.data;
+    } catch (err: any) {
+      return rejectWithValue(err.message || "Failed to initiate Facebook login");
+    }
+  }
+);
+
+// Unlink Facebook account
+export const unlinkFacebookAccount = createAsyncThunk<
+  { success: true; connectionId?: number }, // return type
+  number | undefined,                       // payload type
+  { rejectValue: string }                   // thunkApi config
+>(
+  "facebookAds/unlinkFacebookAccount",
+  async (connectionId, { rejectWithValue, dispatch }) => {
+    const token = getAccessToken();
+    if (!token) return rejectWithValue("No access token found");
+
+    try {
+      const url = connectionId
+        ? `${import.meta.env.VITE_INTEREST_MINER_API_URL}/api/facebook/unlink/${connectionId}`
+        : `${import.meta.env.VITE_INTEREST_MINER_API_URL}/api/facebook/unlink`;
+
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+
+      // Refresh status after unlinking
+      dispatch(checkFacebookStatus());
+
+      return { success: true, connectionId };
+    } catch (err: any) {
+      return rejectWithValue(err.message || "Failed to unlink Facebook account");
+    }
+  }
+);
+
+// Set primary connection
+export const setPrimaryFacebookConnection = createAsyncThunk(
+  "facebookAds/setPrimaryConnection",
+  async (connectionId: number, { rejectWithValue, dispatch }) => {
+    const token = getAccessToken();
+    if (!token) return rejectWithValue("No access token found");
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_INTEREST_MINER_API_URL}/api/facebook/set-primary/${connectionId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+
+      // Refresh status after setting primary
+      dispatch(checkFacebookStatus());
+
+      return { success: true, connectionId };
+    } catch (err: any) {
+      return rejectWithValue(err.message || "Failed to set primary connection");
+    }
+  }
+);
+
 
 
 // ===== Your Existing Thunks (unchanged) =====
@@ -485,9 +639,40 @@ const facebookAdsSlice = createSlice({
   reducers: {
     // All your existing reducers (unchanged)
     clearAllData: state => {
+      // Reset all arrays and values explicitly
       Object.assign(state, initialState);
-      if (typeof window !== "undefined") localStorage.removeItem("FB_ACCESS_TOKEN");
+      state.adAccounts = [];
+      state.campaigns = [];
+      state.insights = [];
+      state.campaignInsights = [];
+      state.campaignInsightstotal = [];
+      state.aggregatedStats = null;
+      state.selectedAccount = "";
+      state.selectedCampaign = "";
+      state.dateFilter = "maximum";
+      state.customDateRange = { since: "", until: "" };
+      state.searchTerm = "";
+      state.statusFilter = "all";
+      state.loading = false;
+      state.initialLoading = true;
+      state.showModal = false;
+      state.showCustomDatePicker = false;
+      state.selectedCampaignForModal = null;
+      state.error = null;
+      state.lastUpdated = null;
+      state.topCampaign = null;
+      state.stableCampaigns = [];
+      state.underperforming = [];
+      state.campaignAnalysis = [];
+      state.overallTotals = null;
+      state.loadingCampaigns = false;
+      state.loadingTotals = false;
+      state.excellentCampaigns = [];
+      state.moderateCampaigns = [];
+      state.insightsCache = {};
+      state.insightsLastUpdated = {};
     },
+
 
     setSelectedAccount: (state, action: PayloadAction<string>) => {
       state.selectedAccount = action.payload;
@@ -552,9 +737,7 @@ const facebookAdsSlice = createSlice({
       state.aggregatedStats = calculateAggregatedStats(state.insights);
     },
 
-    setShowAnalyticsModal: (state, action: PayloadAction<boolean>) => {
-      state.showAnalyticsModal = action.payload;
-    },
+
 
     setAnalysisResults: (state, action: PayloadAction<any>) => {
       // Keep your existing logic here
@@ -576,6 +759,22 @@ const facebookAdsSlice = createSlice({
         }
       });
     },
+    // 🔥 NEW: Facebook authentication reducers
+    clearFacebookAuth: (state) => {
+      state.facebookAuth = {
+        isConnected: false,
+        isLoading: false,
+        status: null,
+        connections: [],
+        primaryConnection: null,
+        error: null,
+      };
+    },
+
+    setFacebookError: (state, action: PayloadAction<string | null>) => {
+      state.facebookAuth.error = action.payload;
+    },
+
   },
   extraReducers: (builder) => {
     builder
@@ -698,7 +897,65 @@ const facebookAdsSlice = createSlice({
       .addCase(fetchCampaignInsights.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
-      });
+      })
+
+      // 🔥 NEW: Facebook status cases
+      .addCase(checkFacebookStatus.pending, (state) => {
+        state.facebookAuth.isLoading = true;
+        state.facebookAuth.error = null;
+      })
+      .addCase(checkFacebookStatus.fulfilled, (state, action) => {
+        const status = action.payload;
+        state.facebookAuth.isLoading = false;
+        state.facebookAuth.status = status;
+        state.facebookAuth.isConnected = status.facebook_connected;
+        state.facebookAuth.connections = status.all_connections;
+        state.facebookAuth.primaryConnection = status.primary_connection;
+      })
+      .addCase(checkFacebookStatus.rejected, (state, action) => {
+        state.facebookAuth.isLoading = false;
+        state.facebookAuth.error = action.payload as string;
+      })
+
+      // Facebook login cases
+      .addCase(initiateFacebookLogin.pending, (state) => {
+        state.facebookAuth.isLoading = true;
+        state.facebookAuth.error = null;
+      })
+      .addCase(initiateFacebookLogin.fulfilled, (state) => {
+        state.facebookAuth.isLoading = false;
+        // Redirect happens in thunk
+      })
+      .addCase(initiateFacebookLogin.rejected, (state, action) => {
+        state.facebookAuth.isLoading = false;
+        state.facebookAuth.error = action.payload as string;
+      })
+
+      // Unlink cases
+      .addCase(unlinkFacebookAccount.pending, (state) => {
+        state.facebookAuth.isLoading = true;
+      })
+      .addCase(unlinkFacebookAccount.fulfilled, (state) => {
+        state.facebookAuth.isLoading = false;
+        // Status will be refreshed by checkFacebookStatus
+      })
+      .addCase(unlinkFacebookAccount.rejected, (state, action) => {
+        state.facebookAuth.isLoading = false;
+        state.facebookAuth.error = action.payload as string;
+      })
+
+      // Set primary cases
+      .addCase(setPrimaryFacebookConnection.pending, (state) => {
+        state.facebookAuth.isLoading = true;
+      })
+      .addCase(setPrimaryFacebookConnection.fulfilled, (state) => {
+        state.facebookAuth.isLoading = false;
+        // Status will be refreshed by checkFacebookStatus
+      })
+      .addCase(setPrimaryFacebookConnection.rejected, (state, action) => {
+        state.facebookAuth.isLoading = false;
+        state.facebookAuth.error = action.payload as string;
+      })
   }
 });
 
@@ -715,9 +972,10 @@ export const {
   setSelectedCampaignForModal,
   clearError,
   calculateStats,
-  setShowAnalyticsModal,
   setAnalysisResults,
   clearAllData,
+  clearFacebookAuth,
+  setFacebookError,
   resetFilters,
 
   // 🔥 NEW: Cache management exports

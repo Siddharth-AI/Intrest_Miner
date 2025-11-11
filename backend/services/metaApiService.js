@@ -1,5 +1,75 @@
 const axios = require("axios");
 
+// Exchange authorization code for access token
+const exchangeCodeForToken = async (code) => {
+  try {
+    const response = await axios.get('https://graph.facebook.com/oauth/access_token', {
+      params: {
+        client_id: process.env.FB_APP_ID,
+        client_secret: process.env.FB_APP_SECRET,
+        redirect_uri: process.env.FACEBOOK_REDIRECT_URI,
+        code: code
+      }
+    });
+
+    return response.data.access_token;
+  } catch (error) {
+    console.error('❌ Code to token exchange error:', error.response?.data);
+    throw new Error('Failed to exchange code for access token');
+  }
+};
+
+// Exchange short-lived token for long-lived token
+const exchangeForLongLivedToken = async (shortLivedToken) => {
+  try {
+    const response = await axios.get('https://graph.facebook.com/oauth/access_token', {
+      params: {
+        grant_type: 'fb_exchange_token',
+        client_id: process.env.FB_APP_ID,
+        client_secret: process.env.FB_APP_SECRET,
+        fb_exchange_token: shortLivedToken
+      }
+    });
+
+    return {
+      access_token: response.data.access_token,
+      expires_in: response.data.expires_in || 5184000 // 60 days default
+    };
+  } catch (error) {
+    console.error('❌ Long-lived token exchange error:', error.response?.data);
+    throw new Error('Failed to exchange for long-lived token');
+  }
+};
+
+// Get user profile from Facebook
+const getUserProfile = async (accessToken) => {
+  try {
+    const response = await axios.get('https://graph.facebook.com/me', {
+      params: {
+        access_token: accessToken,
+        fields: 'id,name,email,picture.type(large)'
+      }
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error('❌ Get user profile error:', error.response?.data);
+    throw new Error('Failed to get user profile from Facebook');
+  }
+};
+
+// Generate Facebook OAuth URL
+const generateAuthUrl = (state = 'dashboard') => {
+  const scopes = 'email,public_profile,ads_read,ads_management,business_management';
+
+  return `https://www.facebook.com/v19.0/dialog/oauth?` +
+    `client_id=${process.env.FB_APP_ID}&` +
+    `redirect_uri=${encodeURIComponent(process.env.FACEBOOK_REDIRECT_URI)}&` +
+    `scope=${scopes}&` +
+    `response_type=code&` +
+    `state=${state}`;
+};
+
 // Get Ad Accounts
 async function getAdAccounts(token) {
   try {
@@ -46,4 +116,12 @@ async function getCampaignInsights(campaignId, token, filters = {}) {
   return res.data.data;
 }
 
-module.exports = { getAdAccounts, getCampaigns, getCampaignInsights };
+module.exports = {
+  exchangeCodeForToken,
+  exchangeForLongLivedToken,
+  getUserProfile,
+  getAdAccounts,
+  getCampaigns,
+  getCampaignInsights,
+  generateAuthUrl
+};

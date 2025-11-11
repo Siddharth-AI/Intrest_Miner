@@ -7,6 +7,7 @@ import React, {
   useRef,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useToast } from "@/hooks/use-toast";
 import {
   ChartBarIcon,
   EyeIcon,
@@ -33,47 +34,43 @@ import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import {
   fetchAdAccounts,
   fetchCampaigns,
-  fetchInsights,
-  fetchInsightsDebounced,
-  setShowAnalyticsModal,
+  // fetchInsights,
+  // fetchInsightsDebounced,
   setShowModal,
   setSelectedCampaignForModal,
   setSelectedAccount,
   clearAllData,
   invalidateInsightsCache,
+  checkFacebookStatus,
 } from "../../../store/features/facebookAdsSlice";
 import { useNavigate } from "react-router-dom";
+import HelpTooltip from "@/components/common/HelpTooltip";
+import FloatingHelpButton from "@/components/common/FloatingHelpButton";
+import BasicAnalyticsHelpModal from "@/components/modals/BasicAnalyticsHelpModal";
+import CampaignModal from "@/components/model/CampaignModal";
 
 const AnalyticsPage: React.FC = () => {
   const dispatch = useAppDispatch();
+  const router = useNavigate();
+  const { toast } = useToast();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [showHelpTooltip, setShowHelpTooltip] = useState(true);
+
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateRangeStart, setDateRangeStart] = useState("");
   const [dateRangeEnd, setDateRangeEnd] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage] = useState(8);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // 🔥 NEW: Optimization tracking
   const [insightsRequested, setInsightsRequested] = useState(false);
   const accountChangeTimerRef = useRef<NodeJS.Timeout>();
 
-  const {
-    adAccounts,
-    campaigns,
-    overallTotals,
-    selectedAccount,
-    loadingTotals,
-    loadingCampaigns,
-    initialLoading,
-    insightsLastUpdated, // 🔥 NEW: Cache tracking
-  } = useAppSelector((state) => state.facebookAds);
-
-  const token = localStorage.getItem("FB_ACCESS_TOKEN");
-  const hasToken = Boolean(token);
-  const router = useNavigate();
-
-  // All your existing useEffects (unchanged)
+  // Theme detection
   useEffect(() => {
     const checkTheme = () => {
       setIsDarkMode(document.documentElement.classList.contains("dark"));
@@ -89,32 +86,65 @@ const AnalyticsPage: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (adAccounts.length === 0) {
-      dispatch(fetchAdAccounts());
-    }
-  }, [adAccounts.length, dispatch]);
+  const {
+    adAccounts,
+    campaigns,
+    overallTotals,
+    selectedAccount,
+    loadingTotals,
+    loadingCampaigns,
+    initialLoading,
+    insightsLastUpdated,
+  } = useAppSelector((state) => state.facebookAds);
 
+  useEffect(() => {
+    const authToken = localStorage.getItem("token");
+    if (authToken) {
+      // 🔥 NEW: Check Facebook status
+      dispatch(checkFacebookStatus());
+    }
+  }, [dispatch]);
+
+  // NEW - Use Facebook auth state
+  const { facebookAuth } = useAppSelector((state) => state.facebookAds);
+  const hasFacebookConnection =
+    facebookAuth.isConnected && facebookAuth.status?.facebook_token_valid;
+
+  // 🔥 ENHANCED: Force fetch ad accounts when connected (includes page reload)
+  useEffect(() => {
+    if (hasFacebookConnection) {
+      // Always fetch accounts if we don't have them
+      if (adAccounts.length === 0) {
+        console.log("🔄 Fetching ad accounts on page load...");
+        dispatch(fetchAdAccounts());
+      }
+    }
+  }, [dispatch, hasFacebookConnection, adAccounts.length]);
+
+  // 🔥 ENHANCED: Auto-select first account with toast notification
   useEffect(() => {
     if (adAccounts.length > 0 && !selectedAccount) {
+      console.log("✅ Auto-selecting first account...");
       dispatch(setSelectedAccount(adAccounts[0].id));
+      toast({
+        title: "Account Auto-Selected",
+        description: `Automatically selected ${adAccounts[0].name}`,
+      });
     }
-  }, [adAccounts, selectedAccount, dispatch]);
+  }, [adAccounts, selectedAccount, dispatch, toast]);
 
-  // 🔥 4. ADD THIS NEW useEffect HERE - REPLACE YOUR COMPLEX ONE
+  // Load campaigns and insights when account is selected
   useEffect(() => {
     if (selectedAccount) {
       console.log(`🔄 Account selected: ${selectedAccount}`);
-
       // Always fetch campaigns (lightweight)
       dispatch(fetchCampaigns(selectedAccount));
-
       // Always fetch insights - let Redux handle caching
-      dispatch(fetchInsights(false)); // false means no force refresh
+      // dispatch(fetchInsights(false)); // false means no force refresh
     }
   }, [selectedAccount, dispatch]);
 
-  // 🔥 ENHANCED: Smart insights loading
+  // Smart insights loading
   const shouldLoadInsights = useMemo(() => {
     if (!selectedAccount) return false;
 
@@ -124,7 +154,7 @@ const AnalyticsPage: React.FC = () => {
     return !lastUpdated || lastUpdated < fiveMinutesAgo;
   }, [selectedAccount, insightsLastUpdated]);
 
-  // 🔥 ENHANCED: Load campaigns immediately, insights smartly
+  // Load campaigns immediately, insights smartly
   useEffect(() => {
     if (selectedAccount) {
       // Always fetch campaigns (lightweight)
@@ -133,7 +163,7 @@ const AnalyticsPage: React.FC = () => {
       // Only fetch insights if needed and not already requested
       if (shouldLoadInsights && !insightsRequested && !loadingTotals) {
         console.log(`🔄 Loading insights for account: ${selectedAccount}`);
-        dispatch(fetchInsightsDebounced());
+        // dispatch(fetchInsightsDebounced());
         setInsightsRequested(true);
       }
     }
@@ -145,7 +175,7 @@ const AnalyticsPage: React.FC = () => {
     dispatch,
   ]);
 
-  // All your existing formatting functions (unchanged)
+  // Formatting functions
   const formatCurrency = useCallback(
     (amount: number) =>
       new Intl.NumberFormat("en-IN", {
@@ -179,17 +209,13 @@ const AnalyticsPage: React.FC = () => {
     }
   }, []);
 
-  // 🔥 ENHANCED: Event handlers with optimization
-  const handleAnalyzeClick = useCallback(() => {
-    dispatch(setShowAnalyticsModal(true));
-  }, [dispatch]);
-
   const handleCampaignClick = useCallback(
     (campaign: any) => {
+      if (!hasFacebookConnection) return;
       dispatch(setSelectedCampaignForModal(campaign));
       dispatch(setShowModal(true));
     },
-    [dispatch]
+    [dispatch, hasFacebookConnection]
   );
 
   const handleAccountChange = useCallback(
@@ -206,37 +232,35 @@ const AnalyticsPage: React.FC = () => {
 
       // Debounce insights fetching
       accountChangeTimerRef.current = setTimeout(() => {
-        if (accountId) {
+        if (accountId && hasFacebookConnection) {
           dispatch(fetchCampaigns(accountId));
 
           // Only fetch insights if needed
           if (shouldLoadInsights) {
-            dispatch(fetchInsightsDebounced());
+            // dispatch(fetchInsightsDebounced());
             setInsightsRequested(true);
           }
         }
       }, 300); // 300ms debounce for account changes
     },
-    [dispatch, shouldLoadInsights]
+    [dispatch, shouldLoadInsights, hasFacebookConnection]
   );
 
   const handleRefresh = useCallback(() => {
-    if (selectedAccount) {
+    if (hasFacebookConnection && selectedAccount) {
       console.log("🔄 Force refresh triggered");
+      dispatch(fetchAdAccounts());
       dispatch(invalidateInsightsCache(selectedAccount));
       dispatch(fetchCampaigns(selectedAccount));
-      dispatch(fetchInsights(true)); // Force refresh
+      // dispatch(fetchInsights(true)); // Force refresh
+      toast({
+        title: "Refreshing Data",
+        description: "Fetching latest account information...",
+      });
     }
-  }, [selectedAccount, dispatch]);
+  }, [selectedAccount, dispatch, toast, hasFacebookConnection]);
 
-  const handleDisconnect = useCallback(() => {
-    dispatch(clearAllData());
-    setCurrentPage(1);
-    setInsightsRequested(false);
-    router("/dashboard");
-  }, [dispatch]);
-
-  // All your existing filter and pagination logic (unchanged)
+  // Filter and pagination logic
   const filteredCampaigns = useMemo(() => {
     if (!campaigns) return [];
 
@@ -280,7 +304,7 @@ const AnalyticsPage: React.FC = () => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, dateRangeStart, dateRangeEnd]);
 
-  // All your existing pagination handlers (unchanged)
+  // Pagination handlers
   const handlePageChange = useCallback(
     (page: number) => {
       if (page >= 1 && page <= paginationData.totalPages) {
@@ -335,74 +359,74 @@ const AnalyticsPage: React.FC = () => {
     return pages;
   }, [paginationData.totalPages, currentPage]);
 
-  // All your existing statsCards logic (unchanged)
-  const statsCards = useMemo(
-    () => [
-      {
-        title: "Total Impressions",
-        value: overallTotals?.impressions?.toLocaleString() || "0",
-        icon: EyeIcon,
-        color: "from-blue-500 to-blue-600",
-        bgColor: "bg-blue-50 dark:bg-blue-900/20",
-        textColor: "text-blue-600 dark:text-blue-400",
-        change: "+12.5%",
-        changeType: "up",
-      },
-      {
-        title: "Total Clicks",
-        value: overallTotals?.clicks?.toLocaleString() || "0",
-        icon: CursorArrowRaysIcon,
-        color: "from-emerald-500 to-emerald-600",
-        bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
-        textColor: "text-emerald-600 dark:text-emerald-400",
-        change: "+8.3%",
-        changeType: "up",
-      },
-      {
-        title: "Total Reach",
-        value: overallTotals?.reach?.toLocaleString() || "0",
-        icon: UsersIcon,
-        color: "from-purple-500 to-purple-600",
-        bgColor: "bg-purple-50 dark:bg-purple-900/20",
-        textColor: "text-purple-600 dark:text-purple-400",
-        change: "+15.2%",
-        changeType: "up",
-      },
-      {
-        title: "Total Spend",
-        value: overallTotals?.spend
-          ? formatCurrency(overallTotals.spend)
-          : "₹0",
-        icon: CurrencyRupeeIcon,
-        color: "from-orange-500 to-orange-600",
-        bgColor: "bg-orange-50 dark:bg-orange-900/20",
-        textColor: "text-orange-600 dark:text-orange-400",
-        change: "+5.7%",
-        changeType: "up",
-      },
-      {
-        title: "Average CTR",
-        value: overallTotals?.ctr ? `${overallTotals.ctr.toFixed(2)}%` : "0%",
-        icon: ArrowTrendingUpIcon,
-        color: "from-indigo-500 to-indigo-600",
-        bgColor: "bg-indigo-50 dark:bg-indigo-900/20",
-        textColor: "text-indigo-600 dark:text-indigo-400",
-        change: "+2.1%",
-        changeType: "up",
-      },
-      {
-        title: "Average CPC",
-        value: overallTotals?.cpc ? formatCurrency(overallTotals.cpc) : "₹0",
-        icon: CurrencyRupeeIcon,
-        color: "from-pink-500 to-pink-600",
-        bgColor: "bg-pink-50 dark:bg-pink-900/20",
-        textColor: "text-pink-600 dark:text-pink-400",
-        change: "-1.2%",
-        changeType: "down",
-      },
-    ],
-    [overallTotals, formatCurrency]
-  );
+  // Stats cards
+  // const statsCards = useMemo(
+  //   () => [
+  //     {
+  //       title: "Total Impressions",
+  //       value: overallTotals?.impressions?.toLocaleString() || "0",
+  //       icon: EyeIcon,
+  //       color: "from-blue-500 to-blue-600",
+  //       bgColor: "bg-blue-50 dark:bg-blue-900/20",
+  //       textColor: "text-blue-600 dark:text-blue-400",
+  //       change: "+12.5%",
+  //       changeType: "up",
+  //     },
+  //     {
+  //       title: "Total Clicks",
+  //       value: overallTotals?.clicks?.toLocaleString() || "0",
+  //       icon: CursorArrowRaysIcon,
+  //       color: "from-emerald-500 to-emerald-600",
+  //       bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
+  //       textColor: "text-emerald-600 dark:text-emerald-400",
+  //       change: "+8.3%",
+  //       changeType: "up",
+  //     },
+  //     {
+  //       title: "Total Reach",
+  //       value: overallTotals?.reach?.toLocaleString() || "0",
+  //       icon: UsersIcon,
+  //       color: "from-purple-500 to-purple-600",
+  //       bgColor: "bg-purple-50 dark:bg-purple-900/20",
+  //       textColor: "text-purple-600 dark:text-purple-400",
+  //       change: "+15.2%",
+  //       changeType: "up",
+  //     },
+  //     {
+  //       title: "Total Spend",
+  //       value: overallTotals?.spend
+  //         ? formatCurrency(overallTotals.spend)
+  //         : "₹0",
+  //       icon: CurrencyRupeeIcon,
+  //       color: "from-orange-500 to-orange-600",
+  //       bgColor: "bg-orange-50 dark:bg-orange-900/20",
+  //       textColor: "text-orange-600 dark:text-orange-400",
+  //       change: "+5.7%",
+  //       changeType: "up",
+  //     },
+  //     {
+  //       title: "Average CTR",
+  //       value: overallTotals?.ctr ? `${overallTotals.ctr.toFixed(2)}%` : "0%",
+  //       icon: ArrowTrendingUpIcon,
+  //       color: "from-indigo-500 to-indigo-600",
+  //       bgColor: "bg-indigo-50 dark:bg-indigo-900/20",
+  //       textColor: "text-indigo-600 dark:text-indigo-400",
+  //       change: "+2.1%",
+  //       changeType: "up",
+  //     },
+  //     {
+  //       title: "Average CPC",
+  //       value: overallTotals?.cpc ? formatCurrency(overallTotals.cpc) : "₹0",
+  //       icon: CurrencyRupeeIcon,
+  //       color: "from-pink-500 to-pink-600",
+  //       bgColor: "bg-pink-50 dark:bg-pink-900/20",
+  //       textColor: "text-pink-600 dark:text-pink-400",
+  //       change: "-1.2%",
+  //       changeType: "down",
+  //     },
+  //   ],
+  //   [overallTotals, formatCurrency]
+  // );
 
   // Clean up timer on unmount
   useEffect(() => {
@@ -413,21 +437,7 @@ const AnalyticsPage: React.FC = () => {
     };
   }, []);
 
-  // All your existing loading and error states (unchanged)
-  // if (initialLoading) {
-  //   return (
-  //     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-  //       <div className="text-center">
-  //         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-  //         <p className="text-gray-600 dark:text-gray-400">
-  //           Loading analytics data...
-  //         </p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
-
-  if (!hasToken) {
+  if (!hasFacebookConnection) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 flex items-center justify-center relative overflow-hidden">
         {/* Background Elements */}
@@ -520,7 +530,7 @@ const AnalyticsPage: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.5 }}
                 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 dark:from-white dark:via-gray-100 dark:to-white bg-clip-text text-transparent mb-3">
-                Authentication Required
+                Connect Meta & Unlock Your Data 🚀
               </motion.h2>
 
               {/* Subtitle */}
@@ -529,41 +539,137 @@ const AnalyticsPage: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.6 }}
                 className="text-gray-600 dark:text-gray-300 text-lg mb-8 leading-relaxed">
-                Connect your Meta Business account to unlock powerful analytics
-                and insights for your campaigns.
+                View your complete campaign performance with real numbers that
+                matter for your business growth.
               </motion.p>
 
-              {/* Features List */}
+              {/* What You'll See - Dashboard Overview */}
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.7 }}
-                className="grid grid-cols-1 gap-4 mb-8">
-                <div className="flex items-center space-x-3 p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-xl border border-blue-100/50 dark:border-blue-800/30">
-                  <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-400/10 rounded-lg flex items-center justify-center">
-                    <ChartBarIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+                {/* Total Impressions */}
+                <div className="p-4 bg-blue-50/50 dark:bg-blue-900/20 rounded-xl border border-blue-100/50 dark:border-blue-800/30">
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">
+                    390K+
                   </div>
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Real-time Campaign Analytics
-                  </span>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    Total Impressions
+                  </div>
                 </div>
 
-                <div className="flex items-center space-x-3 p-3 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100/50 dark:border-indigo-800/30">
-                  <div className="w-8 h-8 bg-indigo-500/10 dark:bg-indigo-400/10 rounded-lg flex items-center justify-center">
-                    <EyeIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                {/* Total Clicks */}
+                <div className="p-4 bg-green-50/50 dark:bg-green-900/20 rounded-xl border border-green-100/50 dark:border-green-800/30">
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">
+                    2.5K
                   </div>
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Performance Insights & Metrics
-                  </span>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    Total Clicks
+                  </div>
                 </div>
 
-                <div className="flex items-center space-x-3 p-3 bg-purple-50/50 dark:bg-purple-900/20 rounded-xl border border-purple-100/50 dark:border-purple-800/30">
-                  <div className="w-8 h-8 bg-purple-500/10 dark:bg-purple-400/10 rounded-lg flex items-center justify-center">
-                    <SparklesIcon className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                {/* Total Spend */}
+                <div className="p-4 bg-purple-50/50 dark:bg-purple-900/20 rounded-xl border border-purple-100/50 dark:border-purple-800/30">
+                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-1">
+                    ₹59K
                   </div>
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    AI-Powered Recommendations
-                  </span>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    Total Spend
+                  </div>
+                </div>
+
+                {/* Average CTR */}
+                <div className="p-4 bg-orange-50/50 dark:bg-orange-900/20 rounded-xl border border-orange-100/50 dark:border-orange-800/30">
+                  <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 mb-1">
+                    1.49%
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    Average CTR
+                  </div>
+                </div>
+
+                {/* Average CPC */}
+                <div className="p-4 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100/50 dark:border-indigo-800/30">
+                  <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-1">
+                    ₹29
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    Average CPC
+                  </div>
+                </div>
+
+                {/* Total Reach */}
+                <div className="p-4 bg-teal-50/50 dark:bg-teal-900/20 rounded-xl border border-teal-100/50 dark:border-teal-800/30">
+                  <div className="text-2xl font-bold text-teal-600 dark:text-teal-400 mb-1">
+                    387K
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    Total Reach
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Features You Get */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.8 }}
+                className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-100/50 dark:border-blue-800/30">
+                  <div className="w-10 h-10 bg-blue-500/10 dark:bg-blue-400/10 rounded-lg flex items-center justify-center">
+                    <ChartBarIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
+                      Complete Campaign Analytics
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      All campaigns, ad sets & individual ads data
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-green-50/80 to-emerald-50/80 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-100/50 dark:border-green-800/30">
+                  <div className="w-10 h-10 bg-green-500/10 dark:bg-green-400/10 rounded-lg flex items-center justify-center">
+                    <EyeIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
+                      Advanced Filtering & Search
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      Filter by date, status, performance & more
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-purple-50/80 to-pink-50/80 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl border border-purple-100/50 dark:border-purple-800/30">
+                  <div className="w-10 h-10 bg-purple-500/10 dark:bg-purple-400/10 rounded-lg flex items-center justify-center">
+                    <SparklesIcon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
+                      Detailed Campaign Insights
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      CTR, CPC, conversions, lead costs & actions
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-orange-50/80 to-yellow-50/80 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-xl border border-orange-100/50 dark:border-orange-800/30">
+                  <div className="w-10 h-10 bg-orange-500/10 dark:bg-orange-400/10 rounded-lg flex items-center justify-center">
+                    <UsersIcon className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
+                      Multi-Account Management
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      Switch between ad accounts seamlessly
+                    </div>
+                  </div>
                 </div>
               </motion.div>
 
@@ -591,7 +697,7 @@ const AnalyticsPage: React.FC = () => {
                     fill="currentColor">
                     <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                   </svg>
-                  <span className="text-lg">Connect Meta Account</span>
+                  <span className="text-lg">Connect & View My Data</span>
                   <motion.div
                     animate={{ x: [0, 4, 0] }}
                     transition={{
@@ -624,11 +730,12 @@ const AnalyticsPage: React.FC = () => {
                   </div>
                   <div className="text-left">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Secure & Private
+                      Read-Only Access
                     </p>
                     <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                      We only access your campaign performance data. Your ads
-                      and settings remain completely under your control.
+                      We only read your campaign data for analytics. Your ads,
+                      budgets, and settings remain completely under your
+                      control.
                     </p>
                   </div>
                 </div>
@@ -636,444 +743,472 @@ const AnalyticsPage: React.FC = () => {
             </div>
           </div>
         </motion.div>
-
-        {/* Decorative elements */}
-        <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-7xl mx-auto space-y-8">
-        {/* 🔥 ENHANCED: Header with cache status */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 shadow-lg">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-            <div>
-              <h1 className="text-2xl font-bold text-white mb-2">
-                Meta Ads Analytics Dashboard
-              </h1>
-              <div className="flex items-center space-x-4">
-                <p className="text-indigo-100">
-                  Comprehensive insights into your Meta Ads performance
-                </p>
-                {/* 🔥 FIXED: Loading indicator */}
-                {loadingTotals && (
-                  <div className="text-xs bg-white/20 px-2 py-1 rounded-full text-indigo-100">
-                    Loading insights...
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleAnalyzeClick}
-                className="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors flex items-center space-x-2">
-                <ChartBarIcon className="h-5 w-5" />
-                <span>Advanced Analytics</span>
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleRefresh}
-                disabled={loadingTotals || loadingCampaigns}
-                className="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors flex items-center space-x-2 disabled:opacity-50">
-                <ArrowPathIcon
-                  className={`h-5 w-5 ${
-                    loadingTotals || loadingCampaigns ? "animate-spin" : ""
-                  }`}
-                />
-                <span>
-                  {loadingTotals || loadingCampaigns
-                    ? "Refreshing..."
-                    : "Refresh"}
-                </span>
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleDisconnect}
-                className="px-4 py-2 bg-red-500/20 text-white rounded-lg hover:bg-red-500/30 transition-colors flex items-center space-x-2">
-                <LinkSlashIcon className="h-5 w-5" />
-                <span>Disconnect</span>
-              </motion.button>
-            </div>
-          </div>
-        </div>
-
-        {/* 🔥 ENHANCED: Account selector with cache info */}
-        {adAccounts.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Select Ad Account
-            </label>
-            <select
-              value={selectedAccount}
-              onChange={(e) => handleAccountChange(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              disabled={loadingCampaigns}>
-              <option value="">Select an account</option>
-              {adAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name} (ID: {account.id})
-                  {insightsLastUpdated[account.id] &&
-                    ` - Updated: ${new Date(
-                      insightsLastUpdated[account.id]
-                    ).toLocaleTimeString()}`}
-                </option>
-              ))}
-            </select>
-            {loadingCampaigns && (
-              <p className="text-sm text-gray-500 mt-2">Loading campaigns...</p>
-            )}
-          </div>
-        )}
-
-        {selectedAccount ? (
-          <>
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {statsCards.map((card, index) => (
-                <motion.div
-                  key={card.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className={`${card.bgColor} backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div
-                      className={`p-3 rounded-lg bg-gradient-to-r ${card.color}`}>
-                      <card.icon className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <span
-                        className={`text-sm font-medium ${
-                          card.changeType === "up"
-                            ? "text-emerald-600"
-                            : "text-red-600"
-                        }`}>
-                        {card.change}
-                      </span>
-                      {card.changeType === "up" ? (
-                        <ArrowTrendingUpIcon className="h-4 w-4 text-emerald-600" />
-                      ) : (
-                        <ArrowTrendingDownIcon className="h-4 w-4 text-red-600" />
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm font-medium mb-1">
-                      {card.title}
-                    </p>
-                    <p className={`text-2xl font-bold ${card.textColor}`}>
-                      {loadingTotals ? "Loading..." : card.value}
-                    </p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Filters */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                  <FunnelIcon className="mr-2 text-purple-600 h-5 w-5" />
-                  Filter Campaigns
-                </h3>
-                {(searchTerm ||
-                  statusFilter !== "all" ||
-                  dateRangeStart ||
-                  dateRangeEnd) && (
-                  <button
-                    onClick={() => {
-                      setSearchTerm("");
-                      setStatusFilter("all");
-                      setDateRangeStart("");
-                      setDateRangeEnd("");
-                    }}
-                    className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-                    Clear All
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="relative">
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search campaigns..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                </div>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                  <option value="all">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="paused">Paused</option>
-                  <option value="archived">Archived</option>
-                </select>
-                <input
-                  type="date"
-                  value={dateRangeStart}
-                  onChange={(e) => setDateRangeStart(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                />
-                <input
-                  type="date"
-                  value={dateRangeEnd}
-                  onChange={(e) => setDateRangeEnd(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            {/* Campaign Table */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                  <ChartBarIcon className="mr-2 text-indigo-600 h-5 w-5" />
-                  Campaign Performance
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Click on any campaign to view detailed insights
-                </p>
-              </div>
-
-              {loadingCampaigns ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600 dark:text-gray-400">
-                      Loading campaigns...
-                    </p>
-                  </div>
-                </div>
-              ) : paginationData.currentPageCampaigns.length > 0 ? (
-                <>
-                  {/* Pagination Info */}
-                  <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-                    <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-                      <span>
-                        Showing {paginationData.startIndex + 1} to{" "}
-                        {paginationData.endIndex} of {paginationData.totalItems}{" "}
-                        campaigns
-                      </span>
-                      <span>
-                        Page {currentPage} of {paginationData.totalPages}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Table */}
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                      <thead className="bg-gray-50 dark:bg-gray-700">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Campaign Name
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Start Date
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            End Date
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Objective
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        {paginationData.currentPageCampaigns.map(
-                          (campaign, index) => (
-                            <motion.tr
-                              key={campaign.id}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: index * 0.03 }}
-                              className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900 dark:text-white max-w-xs truncate">
-                                  {campaign.name}
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">
-                                  ID: {campaign.id}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span
-                                  className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                                    campaign.status
-                                  )}`}>
-                                  {campaign.status}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                {formatDate(campaign.start_time)}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                {campaign.stop_time
-                                  ? formatDate(campaign.stop_time)
-                                  : "Ongoing"}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                {campaign.objective?.replace("OUTCOME_", "") ||
-                                  "N/A"}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <button
-                                  onClick={() => handleCampaignClick(campaign)}
-                                  className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                                  View Details
-                                </button>
-                              </td>
-                            </motion.tr>
-                          )
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Pagination Controls */}
-                  {paginationData.totalPages > 1 && (
-                    <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={handleFirstPage}
-                            disabled={currentPage === 1}
-                            className={`p-2 rounded-lg border transition-colors ${
-                              currentPage === 1
-                                ? "border-gray-300 text-gray-400 cursor-not-allowed"
-                                : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                            }`}>
-                            <ChevronDoubleLeftIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={handlePrevPage}
-                            disabled={currentPage === 1}
-                            className={`p-2 rounded-lg border transition-colors ${
-                              currentPage === 1
-                                ? "border-gray-300 text-gray-400 cursor-not-allowed"
-                                : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                            }`}>
-                            <ChevronLeftIcon className="h-4 w-4" />
-                          </button>
-                        </div>
-
-                        <div className="flex items-center space-x-1">
-                          {getPageNumbers().map((page, index) => (
-                            <React.Fragment key={index}>
-                              {page === "..." ? (
-                                <span className="px-3 py-2 text-gray-500">
-                                  ...
-                                </span>
-                              ) : (
-                                <button
-                                  onClick={() =>
-                                    handlePageChange(page as number)
-                                  }
-                                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                    currentPage === page
-                                      ? "bg-indigo-600 text-white"
-                                      : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
-                                  }`}>
-                                  {page}
-                                </button>
-                              )}
-                            </React.Fragment>
-                          ))}
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={handleNextPage}
-                            disabled={currentPage === paginationData.totalPages}
-                            className={`p-2 rounded-lg border transition-colors ${
-                              currentPage === paginationData.totalPages
-                                ? "border-gray-300 text-gray-400 cursor-not-allowed"
-                                : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                            }`}>
-                            <ChevronRightIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={handleLastPage}
-                            disabled={currentPage === paginationData.totalPages}
-                            className={`p-2 rounded-lg border transition-colors ${
-                              currentPage === paginationData.totalPages
-                                ? "border-gray-300 text-gray-400 cursor-not-allowed"
-                                : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                            }`}>
-                            <ChevronDoubleRightIcon className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
+    <>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className=" mx-auto space-y-8">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 shadow-lg">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+              <div>
+                <h1 className="text-2xl font-bold text-white mb-2">
+                  Meta Ads Analytics Dashboard
+                </h1>
+                <div className="flex items-center space-x-4">
+                  <p className="text-indigo-100">
+                    Comprehensive insights into your Meta Ads performance
+                  </p>
+                  {loadingTotals && (
+                    <div className="text-xs bg-white/20 px-2 py-1 rounded-full text-indigo-100">
+                      Loading insights...
                     </div>
                   )}
-                </>
-              ) : (
-                <div className="text-center py-12">
-                  <CheckCircleIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    No Campaigns Found
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleRefresh}
+                  disabled={loadingTotals || loadingCampaigns}
+                  className="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors flex items-center space-x-2 disabled:opacity-50">
+                  <ArrowPathIcon
+                    className={`h-5 w-5 ${
+                      loadingTotals || loadingCampaigns ? "animate-spin" : ""
+                    }`}
+                  />
+                  <span>
+                    {loadingTotals || loadingCampaigns
+                      ? "Refreshing..."
+                      : "Refresh"}
+                  </span>
+                </motion.button>
+              </div>
+            </div>
+          </div>
+
+          {/* 🔥 ENHANCED: Account selector with auto-selection indicator */}
+          {adAccounts.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Select Ad Account
+                </label>
+                {selectedAccount && (
+                  <span className="px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 rounded-full">
+                    Auto-Selected
+                  </span>
+                )}
+              </div>
+              <select
+                value={selectedAccount || ""}
+                onChange={(e) => handleAccountChange(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                disabled={loadingCampaigns}>
+                <option value="">Select an account</option>
+                {adAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name} (ID: {account.id})
+                    {insightsLastUpdated[account.id] &&
+                      ` - Updated: ${new Date(
+                        insightsLastUpdated[account.id]
+                      ).toLocaleTimeString()}`}
+                  </option>
+                ))}
+              </select>
+              {loadingCampaigns && (
+                <p className="text-sm text-gray-500 mt-2">
+                  Loading campaigns...
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* 🔥 ENHANCED: Proper loading states */}
+          {selectedAccount ? (
+            <>
+              {/* Stats Cards */}
+              {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {statsCards.map((card, index) => (
+                  <motion.div
+                    key={card.title}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className={`${card.bgColor} backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow`}>
+                    <div className="flex items-center justify-between mb-4">
+                      <div
+                        className={`p-3 rounded-lg bg-gradient-to-r ${card.color}`}>
+                        <card.icon className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <span
+                          className={`text-sm font-medium ${
+                            card.changeType === "up"
+                              ? "text-emerald-600"
+                              : "text-red-600"
+                          }`}>
+                          {card.change}
+                        </span>
+                        {card.changeType === "up" ? (
+                          <ArrowTrendingUpIcon className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <ArrowTrendingDownIcon className="h-4 w-4 text-red-600" />
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-gray-600 dark:text-gray-400 text-sm font-medium mb-1">
+                        {card.title}
+                      </p>
+                      <p className={`text-2xl font-bold ${card.textColor}`}>
+                        {loadingTotals ? "Loading..." : card.value}
+                      </p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div> */}
+
+              {/* Filters */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <FunnelIcon className="mr-2 text-purple-600 h-5 w-5" />
+                    Filter Campaigns
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    {searchTerm ||
-                    statusFilter !== "all" ||
-                    dateRangeStart ||
-                    dateRangeEnd
-                      ? "No campaigns match your current filters."
-                      : "No campaign data available for the selected account."}
-                  </p>
                   {(searchTerm ||
                     statusFilter !== "all" ||
                     dateRangeStart ||
                     dateRangeEnd) && (
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                    <button
                       onClick={() => {
                         setSearchTerm("");
                         setStatusFilter("all");
                         setDateRangeStart("");
                         setDateRangeEnd("");
                       }}
-                      className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
-                      Clear Filters
-                    </motion.button>
+                      className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                      Clear All
+                    </button>
                   )}
                 </div>
-              )}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="relative">
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search campaigns..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    />
+                  </div>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="paused">Paused</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                  <input
+                    type="date"
+                    value={dateRangeStart}
+                    onChange={(e) => setDateRangeStart(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                  <input
+                    type="date"
+                    value={dateRangeEnd}
+                    onChange={(e) => setDateRangeEnd(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* Campaign Table */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm">
+                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <ChartBarIcon className="mr-2 text-indigo-600 h-5 w-5" />
+                    Campaign Performance
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Click on any campaign to view detailed insights
+                  </p>
+                </div>
+
+                {loadingCampaigns ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        Loading campaigns...
+                      </p>
+                    </div>
+                  </div>
+                ) : paginationData.currentPageCampaigns.length > 0 ? (
+                  <>
+                    {/* Pagination Info */}
+                    <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                      <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                        <span>
+                          Showing {paginationData.startIndex + 1} to{" "}
+                          {paginationData.endIndex} of{" "}
+                          {paginationData.totalItems} campaigns
+                        </span>
+                        <span>
+                          Page {currentPage} of {paginationData.totalPages}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Table */}
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-700">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                              Campaign Name
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                              Start Date
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                              End Date
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                              Objective
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                          {paginationData.currentPageCampaigns.map(
+                            (campaign, index) => (
+                              <motion.tr
+                                key={campaign.id}
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: index * 0.03 }}
+                                onClick={() => handleCampaignClick(campaign)}
+                                className="hover:bg-gray-100 cursor-pointer dark:hover:bg-gray-700 transition-colors duration-200">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-gray-900 dark:text-white max-w-xs truncate">
+                                    {campaign.name}
+                                  </div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    ID: {campaign.id}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span
+                                    className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                                      campaign.status
+                                    )}`}>
+                                    {campaign.status}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                  {formatDate(campaign.start_time)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                  {campaign.stop_time
+                                    ? formatDate(campaign.stop_time)
+                                    : "Ongoing"}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                  {campaign.objective?.replace(
+                                    "OUTCOME_",
+                                    ""
+                                  ) || "N/A"}
+                                </td>
+                              </motion.tr>
+                            )
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination Controls */}
+                    {paginationData.totalPages > 1 && (
+                      <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={handleFirstPage}
+                              disabled={currentPage === 1}
+                              className={`p-2 rounded-lg border transition-colors ${
+                                currentPage === 1
+                                  ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                  : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                              }`}>
+                              <ChevronDoubleLeftIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={handlePrevPage}
+                              disabled={currentPage === 1}
+                              className={`p-2 rounded-lg border transition-colors ${
+                                currentPage === 1
+                                  ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                  : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                              }`}>
+                              <ChevronLeftIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          <div className="flex items-center space-x-1">
+                            {getPageNumbers().map((page, index) => (
+                              <React.Fragment key={index}>
+                                {page === "..." ? (
+                                  <span className="px-3 py-2 text-gray-500">
+                                    ...
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() =>
+                                      handlePageChange(page as number)
+                                    }
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                      currentPage === page
+                                        ? "bg-indigo-600 text-white"
+                                        : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                                    }`}>
+                                    {page}
+                                  </button>
+                                )}
+                              </React.Fragment>
+                            ))}
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={handleNextPage}
+                              disabled={
+                                currentPage === paginationData.totalPages
+                              }
+                              className={`p-2 rounded-lg border transition-colors ${
+                                currentPage === paginationData.totalPages
+                                  ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                  : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                              }`}>
+                              <ChevronRightIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={handleLastPage}
+                              disabled={
+                                currentPage === paginationData.totalPages
+                              }
+                              className={`p-2 rounded-lg border transition-colors ${
+                                currentPage === paginationData.totalPages
+                                  ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                  : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                              }`}>
+                              <ChevronDoubleRightIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-12">
+                    <CheckCircleIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                      No Campaigns Found
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {searchTerm ||
+                      statusFilter !== "all" ||
+                      dateRangeStart ||
+                      dateRangeEnd
+                        ? "No campaigns match your current filters."
+                        : "No campaign data available for the selected account."}
+                    </p>
+                    {(searchTerm ||
+                      statusFilter !== "all" ||
+                      dateRangeStart ||
+                      dateRangeEnd) && (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                          setSearchTerm("");
+                          setStatusFilter("all");
+                          setDateRangeStart("");
+                          setDateRangeEnd("");
+                        }}
+                        className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                        Clear Filters
+                      </motion.button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : adAccounts.length > 0 ? (
+            // Show account selector when accounts are loaded but none selected
+            <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl">
+              <ClockIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Select Ad Account
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Please select an ad account to view analytics.
+              </p>
             </div>
-          </>
-        ) : (
-          <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl">
-            <ClockIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              Select Ad Account
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              Please select an ad account to view analytics.
-            </p>
-          </div>
-        )}
-      </motion.div>
-    </div>
+          ) : initialLoading ? (
+            // Show loading when data is being fetched
+            <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Loading Ad Accounts
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Fetching your Meta ad accounts...
+              </p>
+            </div>
+          ) : (
+            // Show message when no accounts found
+            <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl">
+              <ClockIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                No Ad Accounts Found
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                No ad accounts available. Please check your Meta Business
+                connection.
+              </p>
+            </div>
+          )}
+        </motion.div>
+        <HelpTooltip
+          show={showHelpTooltip}
+          message="How it works"
+          onClose={() => setShowHelpTooltip(false)}
+        />
+        <FloatingHelpButton
+          onClick={() => setIsHelpModalOpen(true)}
+          help="Basic analytics Help"
+        />
+      </div>
+      <CampaignModal />
+
+      <BasicAnalyticsHelpModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
+      />
+    </>
   );
 };
 

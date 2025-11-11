@@ -1,3 +1,4 @@
+
 // Helper function
 function getTokenFromHeader(req) {
   const authHeader = req.headers.authorization;
@@ -6,6 +7,7 @@ function getTokenFromHeader(req) {
   if (parts.length !== 2 || parts[0] !== "Bearer") throw new Error("Invalid Authorization format");
   return parts[1];
 }
+
 
 function adjustDateRange(date_start, date_stop, campaign) {
   const today = new Date().toISOString().split("T")[0];

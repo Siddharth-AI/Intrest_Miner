@@ -1,4 +1,3 @@
-const axios = require('axios');
 const express = require("express");
 const router = express.Router();
 
@@ -7,7 +6,8 @@ router.use("/search-history", require("./searchHistoryRoutes"));
 router.use("/subscription-plans", require("./subscriptionPlanRoutes"));
 router.use("/subscriptions", require("./subscriptionRoutes"));
 router.use("/billing", require("./billingRoutes"));
-router.use("/facebook", require("./facebookRoutes"));
+router.use("/api/facebook", require("./facebookRoutes"));
 router.use("/business", require("./businessRoutes"));
+router.use("/onboarding", require("./onboarding"));
 
 module.exports = router;

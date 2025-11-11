@@ -6,7 +6,7 @@ const authenticateUser = (req, res, next) => {
         // Get token from header
         const authHeader = req.headers['authorization'];
         const token = authHeader && authHeader.split(' ')[1];
-        
+
         if (!token) {
             return customResponse('Authorization token required', 401, false)(req, res);
         }
@@ -16,7 +16,7 @@ const authenticateUser = (req, res, next) => {
             if (err) {
                 return customResponse('Invalid or expired token', 403, false)(req, res);
             }
-            
+
             // Attach user to request
             req.user = {
                 uuid: decoded.uuid,

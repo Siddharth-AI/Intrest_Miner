@@ -46,7 +46,7 @@ const CampaignModal: React.FC = () => {
   const { showModal, selectedCampaignForModal, campaignInsights, loading } =
     useAppSelector((state) => state.facebookAds);
 
-  console.log(campaignInsights, "campaign insight =>>>>>>>>>>>>>>>>>>>>>>>>>");
+  // console.log(campaignInsights, "campaign insight =>>>>>>>>>>>>>>>>>>>>>>>>>");
 
   // Theme detection
   useEffect(() => {

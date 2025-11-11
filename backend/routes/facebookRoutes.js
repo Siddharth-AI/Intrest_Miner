@@ -2,6 +2,16 @@ const express = require("express");
 const router = express.Router();
 const { authenticateUser } = require("../middlewares/authMiddleware");
 const {
+  initiateFacebookLogin,
+  handleFacebookCallback,
+  getFacebookStatus,
+  unlinkFacebook,
+  searchAdInterests,
+  getApiStatus,
+  refreshToken,
+} = require("../controllers/facebookController");
+
+const {
   checkSubscriptionLimits,
   updateSearchUsage,
   checkAdminAccess,
@@ -9,27 +19,30 @@ const {
 const {
   validateSearchAdInterests,
 } = require("../middlewares/facebookValidators");
-const {
-  searchAdInterests,
-  getApiStatus,
-  refreshToken,
-} = require("../controllers/facebookController");
 
-// Public route for API status
-router.get("/status", getApiStatus);
+// Public routes for Facebook and OAuth
+router.get("/facebooktokenstatus", getApiStatus);
+router.get("/login", initiateFacebookLogin);
+router.get("/callback", handleFacebookCallback);
 
-// Protected routes (require authentication)
-router.use(authenticateUser);
+// ==================== PROTECTED ROUTES ====================
+router.get("/status", authenticateUser, getFacebookStatus);
+
+// 🔥 NEW: Add specific connection unlink route FIRST
+router.delete("/unlink/:connectionId", authenticateUser, unlinkFacebook);
+
+// Keep the existing unlink route for unlinking ALL connections
+router.delete("/unlink", authenticateUser, unlinkFacebook);
 
 // Search ad interests (requires active subscription)
 router.post(
-  "/search",
+  "/search", authenticateUser,
   validateSearchAdInterests,
   searchAdInterests,
   updateSearchUsage
 );
 
 // Admin only routes
-router.post("/refresh-token", refreshToken);
+router.post("/refresh-token", authenticateUser, refreshToken);
 
 module.exports = router;

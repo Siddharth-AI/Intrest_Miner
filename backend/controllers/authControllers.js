@@ -1,18 +1,17 @@
 const { v4: uuidv4 } = require("uuid");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
-const userSchema = require("../schema/userSchema");
-const { createTable, checkRecordExists, insertRecord, selectRecord, updateRecord } = require("../utils/sqlFunctions");
+const { checkRecordExists, insertRecord, selectRecord, updateRecord } = require("../utils/sqlFunctions");
 const { customResponse } = require("../utils/customResponse");
 const crypto = require("crypto");
 const { sendOTPEmail, sendWelcomeEmail } = require("../utils/emailService");
 // const { getRecordByField } = require("../utils/profileHepler");
 
 const generateAccessToken = (payload) => {
-    return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "7d" });
+    return jwt.sign(payload, process.env.JWT_SECRET);
 };
 
-const register = async (req, res, next) => {
+const register = async (req, res) => {
     const { name, email, password } = req.body;
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
@@ -27,7 +26,6 @@ const register = async (req, res, next) => {
     };
 
     try {
-        await createTable(userSchema);
         const userAlreadyExists = await checkRecordExists("users", "email", email);
         if (userAlreadyExists) {
             customResponse("Email already exists", 409, false)(req, res);

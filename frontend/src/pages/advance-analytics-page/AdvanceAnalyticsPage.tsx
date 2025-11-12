@@ -68,6 +68,8 @@ const AdvanceAnalyticsPage: React.FC = () => {
   const [showCampaignDetails, setShowCampaignDetails] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const accountChangeTimerRef = useRef<NodeJS.Timeout>();
+  // Add this state for export loading
+  const [isExporting, setIsExporting] = useState(false);
 
   const [insightsRequested, setInsightsRequested] = useState(false);
   // Add this state after your existing state declarations
@@ -596,6 +598,156 @@ const AdvanceAnalyticsPage: React.FC = () => {
   const handleCloseCampaignDetails = () => {
     setShowCampaignDetails(false);
     setSelectedCampaign(null);
+  };
+
+  const handleExportData = async () => {
+    try {
+      if (!selectedAccount) {
+        toast({
+          title: "No Account Selected",
+          description: "Please select an ad account first",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (filteredCampaigns.length === 0) {
+        toast({
+          title: "No Data to Export",
+          description: "No campaigns match your current filters",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setIsExporting(true);
+
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast({
+          title: "Authentication Required",
+          description: "Please login to export data",
+          variant: "destructive",
+        });
+        setIsExporting(false);
+        return;
+      }
+
+      // Get account name
+      const selectedAccountData = adAccounts.find(
+        (acc) => acc.id === selectedAccount
+      );
+      const accountName =
+        selectedAccountData?.name || selectedAccount.replace("act_", "");
+
+      const campaignsToExport = filteredCampaigns.map((campaign) => ({
+        id: campaign.id,
+        name: campaign.name,
+        status: campaign.status,
+        objective: campaign.objective,
+        start_time: campaign.start_time,
+      }));
+
+      console.log(
+        `📊 Exporting ${campaignsToExport.length} campaigns for account: ${accountName}`
+      );
+
+      toast({
+        title: "Preparing Export with AI Analysis",
+        description: `Analyzing ${campaignsToExport.length} campaigns... This may take a moment.`,
+      });
+
+      const response = await fetch(
+        `${import.meta.env.VITE_INTEREST_MINER_API_URL}/api/export/campaigns`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            adAccountId: selectedAccount,
+            adAccountName: accountName,
+            campaigns: campaignsToExport,
+            date_start: dateRangeStart || undefined,
+            date_stop: dateRangeEnd || undefined,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Export failed");
+      }
+
+      // ✅ FIXED: Extract filename from server's Content-Disposition header
+      let filename = `Campaign_Report_${
+        new Date().toISOString().split("T")[0]
+      }.xlsx`; // Fallback
+
+      const contentDisposition = response.headers.get("Content-Disposition");
+      if (contentDisposition) {
+        // Extract filename from: attachment; filename="gearon-2022_Campaign_Report_2025-11-12_16-18-27.xlsx"
+        const filenameMatch = contentDisposition.match(
+          /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/
+        );
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, ""); // Remove quotes
+          console.log(`📥 Using filename from server: ${filename}`);
+        }
+      } else {
+        // ✅ Alternative: Generate filename on frontend if header not available
+        const now = new Date();
+        const dateStr = now.toISOString().split("T")[0];
+        const hours = String(now.getHours()).padStart(2, "0");
+        const minutes = String(now.getMinutes()).padStart(2, "0");
+        const seconds = String(now.getSeconds()).padStart(2, "0");
+        const timeStr = `${hours}-${minutes}-${seconds}`;
+
+        const cleanAccountName = accountName
+          .replace(/[^a-zA-Z0-9-_]/g, "_")
+          .substring(0, 30);
+
+        filename = `${cleanAccountName}_Campaign_Report_${dateStr}_${timeStr}.xlsx`;
+        console.log(`📥 Generated filename on frontend: ${filename}`);
+      }
+
+      console.log(`💾 Downloading as: ${filename}`);
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename; // ✅ Use dynamic filename
+
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+
+      toast({
+        title: "Export Successful! 🎉",
+        description: `Downloaded: ${filename}`,
+      });
+
+      setIsExporting(false);
+    } catch (error) {
+      console.error("❌ Export error:", error);
+      toast({
+        title: "Export Failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to export data. Please try again.",
+        variant: "destructive",
+      });
+      setIsExporting(false);
+    }
   };
 
   if (!hasActiveSubscription) {
@@ -1189,7 +1341,8 @@ const AdvanceAnalyticsPage: React.FC = () => {
                       </div>
 
                       {/* Filters - using your existing grid layout */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                      {/* Filters - using your existing grid layout */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
                         {/* Search */}
                         <div className="relative">
                           <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -1241,6 +1394,68 @@ const AdvanceAnalyticsPage: React.FC = () => {
                           className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                           placeholder="End Date"
                         />
+
+                        {/* 🆕 EXPORT BUTTON */}
+                        <button
+                          onClick={handleExportData}
+                          disabled={
+                            !selectedAccount ||
+                            filteredCampaigns.length === 0 ||
+                            isExporting
+                          }
+                          className={`
+      flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200
+      ${
+        !selectedAccount || filteredCampaigns.length === 0 || isExporting
+          ? "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+          : "bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+      }
+    `}>
+                          {isExporting ? (
+                            <>
+                              <svg
+                                className="animate-spin h-4 w-4"
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24">
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"></circle>
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              <span>Exporting...</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-4 w-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                />
+                              </svg>
+                              <span>Export Data</span>
+                              {filteredCampaigns.length > 0 && (
+                                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                                  {filteredCampaigns.length}
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </button>
                       </div>
 
                       {/* 🔥 NEW: Pagination Info */}

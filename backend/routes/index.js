@@ -9,5 +9,6 @@ router.use("/billing", require("./billingRoutes"));
 router.use("/api/facebook", require("./facebookRoutes"));
 router.use("/business", require("./businessRoutes"));
 router.use("/onboarding", require("./onboarding"));
+router.use('/api/export/campaigns', require('./exportFilteredCampaigns'));
 
 module.exports = router;

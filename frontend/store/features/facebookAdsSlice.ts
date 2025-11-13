@@ -242,6 +242,7 @@ interface FacebookAdsState {
   excellentCampaigns: any[];
   moderateCampaigns: any[];
 
+
   // 🔥 NEW: Optimized caching fields
   insightsCache: Record<string, {
     data: any;
@@ -249,6 +250,13 @@ interface FacebookAdsState {
     expiresIn: number;
   }>;
   insightsLastUpdated: Record<string, number>;
+  exportModal: {
+    isOpen: boolean;
+    options: {
+      includeCampaignDetails: boolean;
+      includeAIAnalysis: boolean;
+    };
+  };
 }
 
 
@@ -382,6 +390,13 @@ const initialState: FacebookAdsState = {
   // 🔥 NEW: Caching initialization
   insightsCache: {},
   insightsLastUpdated: {},
+  exportModal: {
+    isOpen: false,
+    options: {
+      includeCampaignDetails: true,
+      includeAIAnalysis: true
+    }
+  }
 };
 
 
@@ -737,8 +752,6 @@ const facebookAdsSlice = createSlice({
       state.aggregatedStats = calculateAggregatedStats(state.insights);
     },
 
-
-
     setAnalysisResults: (state, action: PayloadAction<any>) => {
       // Keep your existing logic here
     },
@@ -774,6 +787,16 @@ const facebookAdsSlice = createSlice({
     setFacebookError: (state, action: PayloadAction<string | null>) => {
       state.facebookAuth.error = action.payload;
     },
+    // ... existing reducers
+    openExportModal: (state) => {
+      state.exportModal.isOpen = true;
+    },
+    closeExportModal: (state) => {
+      state.exportModal.isOpen = false;
+    },
+    setExportOptions: (state, action: PayloadAction<{ includeCampaignDetails: boolean; includeAIAnalysis: boolean }>) => {
+      state.exportModal.options = action.payload;
+    }
 
   },
   extraReducers: (builder) => {
@@ -980,6 +1003,9 @@ export const {
 
   // 🔥 NEW: Cache management exports
   invalidateInsightsCache,
+  openExportModal,
+  closeExportModal,
+  setExportOptions,
 } = facebookAdsSlice.actions;
 
 export default facebookAdsSlice.reducer;

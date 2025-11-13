@@ -44,6 +44,14 @@ import HelpTooltip from "@/components/common/HelpTooltip";
 import FloatingHelpButton from "@/components/common/FloatingHelpButton";
 import AdvancedAnalyticsHelpModal from "@/components/modals/AdvancedAnalyticsHelpModal";
 // Add these imports
+import ExportOptionsModal, {
+  ExportOptions,
+} from "@/components/modals/ExportOptionsModal";
+import {
+  openExportModal,
+  closeExportModal,
+} from "../../../store/features/facebookAdsSlice";
+
 import {
   fetchAdAccounts,
   setSelectedAccount,
@@ -58,6 +66,7 @@ const AdvanceAnalyticsPage: React.FC = () => {
   const dispatch = useAppDispatch();
 
   const { toast } = useToast();
+  const exportModal = useAppSelector((state) => state.facebookAds.exportModal);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -600,7 +609,7 @@ const AdvanceAnalyticsPage: React.FC = () => {
     setSelectedCampaign(null);
   };
 
-  const handleExportData = async () => {
+  const handleExportData = async (options: ExportOptions) => {
     try {
       if (!selectedAccount) {
         toast({
@@ -633,7 +642,6 @@ const AdvanceAnalyticsPage: React.FC = () => {
         return;
       }
 
-      // Get account name
       const selectedAccountData = adAccounts.find(
         (acc) => acc.id === selectedAccount
       );
@@ -648,13 +656,21 @@ const AdvanceAnalyticsPage: React.FC = () => {
         start_time: campaign.start_time,
       }));
 
-      console.log(
-        `📊 Exporting ${campaignsToExport.length} campaigns for account: ${accountName}`
-      );
+      console.log("Exporting with options:", options);
+
+      // Show appropriate toast based on options
+      let toastMessage = "";
+      if (options.includeCampaignDetails && options.includeAIAnalysis) {
+        toastMessage = `Analyzing ${campaignsToExport.length} campaigns with AI... This may take a moment.`;
+      } else if (options.includeAIAnalysis) {
+        toastMessage = `Generating AI analysis for ${campaignsToExport.length} campaigns...`;
+      } else {
+        toastMessage = `Preparing campaign data for ${campaignsToExport.length} campaigns...`;
+      }
 
       toast({
-        title: "Preparing Export with AI Analysis",
-        description: `Analyzing ${campaignsToExport.length} campaigns... This may take a moment.`,
+        title: "Preparing Export",
+        description: toastMessage,
       });
 
       const response = await fetch(
@@ -671,6 +687,11 @@ const AdvanceAnalyticsPage: React.FC = () => {
             campaigns: campaignsToExport,
             date_start: dateRangeStart || undefined,
             date_stop: dateRangeEnd || undefined,
+            // 🔥 SEND EXPORT OPTIONS
+            exportOptions: {
+              includeCampaignDetails: options.includeCampaignDetails,
+              includeAIAnalysis: options.includeAIAnalysis,
+            },
           }),
         }
       );
@@ -680,70 +701,46 @@ const AdvanceAnalyticsPage: React.FC = () => {
         throw new Error(errorData.message || "Export failed");
       }
 
-      // ✅ FIXED: Extract filename from server's Content-Disposition header
+      // Extract filename
       let filename = `Campaign_Report_${
         new Date().toISOString().split("T")[0]
-      }.xlsx`; // Fallback
-
+      }.xlsx`;
       const contentDisposition = response.headers.get("Content-Disposition");
       if (contentDisposition) {
-        // Extract filename from: attachment; filename="gearon-2022_Campaign_Report_2025-11-12_16-18-27.xlsx"
         const filenameMatch = contentDisposition.match(
           /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/
         );
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, ""); // Remove quotes
-          console.log(`📥 Using filename from server: ${filename}`);
+        if (filenameMatch) {
+          filename = filenameMatch[1].replace(/['"]/g, "");
         }
-      } else {
-        // ✅ Alternative: Generate filename on frontend if header not available
-        const now = new Date();
-        const dateStr = now.toISOString().split("T")[0];
-        const hours = String(now.getHours()).padStart(2, "0");
-        const minutes = String(now.getMinutes()).padStart(2, "0");
-        const seconds = String(now.getSeconds()).padStart(2, "0");
-        const timeStr = `${hours}-${minutes}-${seconds}`;
-
-        const cleanAccountName = accountName
-          .replace(/[^a-zA-Z0-9-_]/g, "_")
-          .substring(0, 30);
-
-        filename = `${cleanAccountName}_Campaign_Report_${dateStr}_${timeStr}.xlsx`;
-        console.log(`📥 Generated filename on frontend: ${filename}`);
       }
 
-      console.log(`💾 Downloading as: ${filename}`);
-
-      // Create blob and download
+      // Download
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = filename; // ✅ Use dynamic filename
-
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
 
-      // Cleanup
       setTimeout(() => {
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
       }, 100);
 
       toast({
-        title: "Export Successful! 🎉",
+        title: "Export Successful!",
         description: `Downloaded: ${filename}`,
       });
 
       setIsExporting(false);
     } catch (error) {
-      console.error("❌ Export error:", error);
+      console.error("Export error:", error);
       toast({
         title: "Export Failed",
         description:
-          error instanceof Error
-            ? error.message
-            : "Failed to export data. Please try again.",
+          error instanceof Error ? error.message : "Failed to export data",
         variant: "destructive",
       });
       setIsExporting(false);
@@ -1397,7 +1394,7 @@ const AdvanceAnalyticsPage: React.FC = () => {
 
                         {/* 🆕 EXPORT BUTTON */}
                         <button
-                          onClick={handleExportData}
+                          onClick={() => dispatch(openExportModal())}
                           disabled={
                             !selectedAccount ||
                             filteredCampaigns.length === 0 ||
@@ -1779,6 +1776,12 @@ const AdvanceAnalyticsPage: React.FC = () => {
               onClose={handleCloseCampaignDetails}
               campaign={selectedCampaign}
               category={selectedCategory}
+            />
+            <ExportOptionsModal
+              isOpen={exportModal.isOpen}
+              onClose={() => dispatch(closeExportModal())}
+              onExport={handleExportData}
+              campaignCount={filteredCampaigns.length}
             />
           </div>
         </div>

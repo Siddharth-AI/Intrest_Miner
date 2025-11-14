@@ -34,6 +34,7 @@ import {
   fetchSearchHistory,
   SearchHistoryItem,
 } from "../../../store/features/facebookSearchHistorySlice";
+import { performLogout } from "@/utils/logout";
 
 // Define TypeScript interfaces
 // UserProfileData is imported from profileSlice.ts
@@ -156,11 +157,8 @@ const Profile: React.FC = () => {
     }
   }, [openaiBusinessHistory, facebookSearchHistory]);
 
-  const handleLogout = (): void => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("access_token");
-    console.log("Tokens removed from localStorage");
-    router("/");
+  const handleLogout = async (): Promise<void> => {
+    await performLogout(dispatch, router);
   };
 
   const handleViewSearchHistory = (): void => {

@@ -9,8 +9,7 @@ import {
   PURGE,
   REGISTER,
 } from 'redux-persist';
-import storage from 'redux-persist/lib/storage';
-
+import storage from 'redux-persist/lib/storage'; // localStorage
 import registrationReducer from "./features/registrationSlice";
 import loginReducer from "./features/loginSlice";
 import forgotPasswordReducer from "./features/forgotPasswordSlice";
@@ -25,11 +24,37 @@ import billingHistoryReducer from './features/billingHistorySlice';
 import razorpayReducer from './features/razorpaySlice';
 import facebookAdsReducer from './features/facebookAdsSlice';
 import onboardingReducer from './features/onboardingSlice';
-const persistConfig = {
+
+// 🔥 NEW: Separate persist config for facebookAds with selective fields
+const facebookAdsPersistConfig = {
+  key: 'facebookAds',
+  storage,
+  // 🔥 CRITICAL: Only persist cache data, not UI state
+  whitelist: ['insightsCache', 'insightsLastUpdated'],
+  blacklist: [
+    'loading',
+    'loadingTotals',
+    'loadingCampaigns',
+    'initialLoading',
+    'error',
+    'showModal',
+    'showCustomDatePicker',
+    'selectedCampaignForModal',
+    'campaignInsights',
+    'campaignInsightstotal'
+  ]
+};
+
+// 🔥 Wrap facebookAdsReducer with persist
+const persistedFacebookAdsReducer = persistReducer(facebookAdsPersistConfig, facebookAdsReducer);
+
+// Root persist config (for other slices)
+const rootPersistConfig = {
   key: 'root',
   version: 1,
   storage,
-  whitelist: ['openAi', 'aiSearchHistory'], // Only persist these slices
+  whitelist: ['openAi', 'aiSearchHistory'], // Keep existing persisted slices
+  blacklist: ['facebookAds'] // 🔥 Exclude facebookAds (handled separately)
 };
 
 const rootReducer = combineReducers({
@@ -45,11 +70,11 @@ const rootReducer = combineReducers({
   aiSearchHistory: aiSearchHistoryReducer,
   billingHistory: billingHistoryReducer,
   razorpay: razorpayReducer,
-  facebookAds: facebookAdsReducer,
+  facebookAds: persistedFacebookAdsReducer, // 🔥 Use persisted version
   onboarding: onboardingReducer,
 });
 
-const persistedReducer = persistReducer(persistConfig, rootReducer);
+const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
 
 export const store = configureStore({
   reducer: persistedReducer,

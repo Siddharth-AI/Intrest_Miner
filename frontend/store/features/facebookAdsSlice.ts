@@ -582,27 +582,30 @@ export const fetchInsights = createAsyncThunk(
 
 
     // 🔥 Check cache first, but allow force refresh
+    // 🔥 Check cache first (unless force refresh)
     if (!forceRefresh) {
       const cachedData = insightsCache[cacheKey];
-      if (isCacheValid(cachedData)) {
-        const ageHours = ((Date.now() - cachedData.timestamp) / (60 * 60 * 1000)).toFixed(1);
-        console.log(`✅ Using cached insights for ${selectedAccount} (${ageHours} hours old)`);
-        console.log(`📊 Cached campaigns: ${cachedData.data.campaignAnalysis?.length || 0}`);
-        // Return cached data with special flag to update UI properly
-        return {
-          ...cachedData.data,
-          fromCache: true,
-          cacheKey,
-          timestamp: cachedData.timestamp
-        };
-      }
 
-      // If cache expired or doesn't exist
       if (cachedData) {
-        const ageHours = ((Date.now() - cachedData.timestamp) / (60 * 60 * 1000)).toFixed(1);
-        console.log(`⏰ Cache expired (${ageHours} hours old), fetching fresh data...`);
+        const ageMs = Date.now() - cachedData.timestamp;
+        const CACHE_DURATION_MS = 12 * 60 * 60 * 1000;
+
+        if (ageMs < CACHE_DURATION_MS) {
+          const ageHours = (ageMs / (60 * 60 * 1000)).toFixed(1);
+          console.log(`✅ Using cached data (${ageHours} hours old)`);
+
+          return {
+            ...cachedData.data,
+            fromCache: true,
+            cacheKey,
+            timestamp: cachedData.timestamp
+          };
+        } else {
+          const ageHours = (ageMs / (60 * 60 * 1000)).toFixed(1);
+          console.log(`⏰ Cache expired (${ageHours} hours old)`);
+        }
       } else {
-        console.log(`🔄 No cache found, fetching fresh data...`);
+        console.log('❌ No cache found');
       }
     }
 
@@ -611,6 +614,7 @@ export const fetchInsights = createAsyncThunk(
     if (forceRefresh) {
       console.log('🔄 Force refresh requested, bypassing cache...');
     }
+
     try {
       console.log(`🔄 Fetching insights for ${selectedAccount} | AI: ${enableAI ? 'ENABLED 💸' : 'DISABLED (FREE)'}`);
       const body: any = {
@@ -732,6 +736,9 @@ const facebookAdsSlice = createSlice({
   reducers: {
     // All your existing reducers (unchanged)
     clearAllData: state => {
+      const preservedInsightsCache = state.insightsCache;
+      const preservedInsightsLastUpdated = state.insightsLastUpdated;
+
       // Reset all arrays and values explicitly
       Object.assign(state, initialState);
       state.adAccounts = [];
@@ -762,8 +769,11 @@ const facebookAdsSlice = createSlice({
       state.loadingTotals = false;
       state.excellentCampaigns = [];
       state.moderateCampaigns = [];
-      state.insightsCache = {};
-      state.insightsLastUpdated = {};
+      // 🔥 RESTORE AI cache (DON'T CLEAR ON LOGOUT)
+      state.insightsCache = preservedInsightsCache;
+      state.insightsLastUpdated = preservedInsightsLastUpdated;
+
+      console.log('✅ State cleared (AI cache preserved)');
     },
 
 

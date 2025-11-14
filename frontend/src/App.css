@@ -124,3 +124,12 @@
     transform: translate(-50%, -50%) scale(1);
   }
 }
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}

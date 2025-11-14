@@ -25,6 +25,7 @@ import { FaMoneyBillWave } from "react-icons/fa";
 import { logout } from "../../../store/features/loginSlice";
 import Portal from "../ui/Portal";
 import { fetchProfileData } from "../../../store/features/profileSlice";
+import { performLogout } from "@/utils/logout";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -121,22 +122,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, isCollapsed }) => {
     }
   }, [showUserMenu, isCollapsed, isMobile]);
 
-  const handleLogout = () => {
-    // Clear authentication token
-    localStorage.clear();
-
-    // Clear Facebook data and token
-    dispatch(clearAllData());
-
-    // Reset other states if needed
-    dispatch(resetSearchState());
-
-    // Logout user
-    dispatch(logout());
-
-    // Navigate to home
-    router("/");
-    setShowUserMenu(false);
+  const handleLogout = async () => {
+    await performLogout(dispatch, router, {
+      closeModal: () => setShowUserMenu(false),
+    });
   };
 
   const navigationItems = [

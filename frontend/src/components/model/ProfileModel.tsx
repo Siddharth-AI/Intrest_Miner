@@ -6,7 +6,9 @@ import { motion, AnimatePresence } from "framer-motion"; // Import AnimatePresen
 import { User, LogOut, X, Settings, History } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom"; // Assuming react-router-dom for navigation
 import { FaMoneyBillWave } from "react-icons/fa";
-
+import { clearCache } from "../../../store/features/facebookAdsSlice";
+import { performLogout } from "@/utils/logout";
+import { useAppDispatch } from "../../../store/hooks";
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -21,6 +23,8 @@ const ProfileModal: React.FC<ProfileModalProps> = ({
   const [mounted, setMounted] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null); // Renamed modalRef to dropdownRef for clarity
   const navigate = useNavigate();
+
+  const dispatch = useAppDispatch();
 
   // Handle mounting for SSR compatibility
   useEffect(() => {
@@ -99,10 +103,10 @@ const ProfileModal: React.FC<ProfileModalProps> = ({
     }
   }, [isOpen, triggerRef]); // Depend on isOpen and triggerRef for re-calculation
 
-  const handleLogout = (): void => {
-    localStorage.clear(); // Clear local storage (assuming access token is here)
-    navigate("/"); // Navigate to home/login page
-    onClose(); // Close the modal after logout
+  const handleLogout = async (): Promise<void> => {
+    await performLogout(dispatch, navigate, {
+      closeModal: onClose,
+    });
   };
 
   if (!isOpen || !mounted) {

@@ -305,7 +305,7 @@ interface CustomDropdownProps {
   colorScheme: "blue" | "purple";
 }
 
-const CustomDropdown: React.FC<CustomDropdownProps> = ({
+export const CustomDropdown: React.FC<CustomDropdownProps> = ({
   label,
   options,
   value,

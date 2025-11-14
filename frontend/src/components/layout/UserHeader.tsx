@@ -18,7 +18,6 @@ import { Link, useNavigate } from "react-router-dom";
 import PremiumMinerButton from "../ui/PremiumMinerButton";
 import { motion } from "framer-motion";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
-import { resetSearchState } from "../../../store/features/facebookSlice";
 import { fetchProfileData } from "../../../store/features/profileSlice";
 import { openPricingModal } from "../../../store/features/pricingModalSlice";
 

@@ -32,9 +32,9 @@ import {
   ChevronRightIcon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
-  TrophyIcon,
   StarIcon,
   XMarkIcon,
+  AdjustmentsHorizontalIcon,
 } from "@heroicons/react/24/outline";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import AnalyticsDetailsModal from "@/components/model/AnalyticsDetailsModal";
@@ -53,21 +53,13 @@ import {
   fetchAdAccounts,
   setSelectedAccount,
   fetchCampaigns,
-  fetchInsights,
   checkFacebookStatus,
-  setDateFilter,
-  setCustomDateRange,
-  setSearchTerm,
-  setStatusFilter,
-  setShowModal,
-  setShowCustomDatePicker,
-  setSelectedCampaignForModal,
-  clearError,
   clearCache,
   fetchInsightsDebounced,
 } from "../../../store/features/facebookAdsSlice";
 import { useToast } from "@/hooks/use-toast";
 import { Download, RefreshCw } from "lucide-react";
+import { CustomDropdown } from "@/components/common/CustomDropdown";
 
 const AdvanceAnalyticsPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -84,6 +76,8 @@ const AdvanceAnalyticsPage: React.FC = () => {
   const [showCampaignDetails, setShowCampaignDetails] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const accountChangeTimerRef = useRef<NodeJS.Timeout>();
+  const [isAIRunning, setIsAIRunning] = useState(false);
+
   // Add this state for export loading
   const [isExporting, setIsExporting] = useState(false);
 
@@ -101,6 +95,39 @@ const AdvanceAnalyticsPage: React.FC = () => {
     customDateRange, // 🔥 ADD THIS
     insightsCache,
   } = useAppSelector((state) => state.facebookAds);
+
+  // 🔥 Generate cache key
+  const aiCacheKey = useMemo(() => {
+    if (!selectedAccount) return null;
+    return `${selectedAccount}_${dateFilter}_${
+      customDateRange.since || "none"
+    }_${customDateRange.until || "none"}_AI_ON`;
+  }, [selectedAccount, dateFilter, customDateRange]);
+
+  // 🔥 Check if we have valid cached data
+  const hasValidCache = useMemo(() => {
+    if (!aiCacheKey || !insightsCache[aiCacheKey]) {
+      return false;
+    }
+
+    const cacheEntry = insightsCache[aiCacheKey];
+    const ageMs = Date.now() - cacheEntry.timestamp;
+    const CACHE_DURATION_MS = 12 * 60 * 60 * 1000;
+
+    return ageMs < CACHE_DURATION_MS;
+  }, [aiCacheKey, insightsCache]);
+
+  useEffect(() => {
+    if (!selectedAccount) return;
+
+    console.log("🔍 AdvanceAnalytics mounted/updated");
+    console.log("📊 Selected Account:", selectedAccount);
+    console.log("🗝️ Cache Key:", aiCacheKey);
+    console.log("💾 Has Valid Cache:", hasValidCache);
+
+    // Reset request flag when account/filters change
+    setInsightsRequested(false);
+  }, [selectedAccount, dateFilter, customDateRange]);
 
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [showHelpTooltip, setShowHelpTooltip] = useState(true);
@@ -196,83 +223,23 @@ const AdvanceAnalyticsPage: React.FC = () => {
     setInsightsRequested(false);
   }, []); // Run only once on mount
 
-  // useEffect(() => {
-  //   console.log("🔍 Checking insights conditions:", {
-  //     selectedAccount: !!selectedAccount,
-  //     shouldLoadInsights,
-  //     insightsRequested,
-  //     loadingTotals,
-  //   });
-
-  //   if (
-  //     selectedAccount &&
-  //     shouldLoadInsights &&
-  //     !insightsRequested &&
-  //     !loadingTotals
-  //   ) {
-  //     console.log("🔄 AdvanceAnalytics: Loading insights for", selectedAccount);
-
-  //     // 🔥 Generate AI cache key to check if AI data exists
-  //     const aiCacheKey = `${selectedAccount}_${dateFilter}_${
-  //       customDateRange.since || "none"
-  //     }_${customDateRange.until || "none"}_AI_ON`;
-  //     const hasAICache = insightsCache && insightsCache[aiCacheKey];
-
-  //     if (!hasAICache) {
-  //       console.log("⚠️ No AI cache found, forcing AI analysis...");
-  //       // Force refresh with AI if no AI cache exists
-  //       dispatch(
-  //         fetchInsightsDebounced({
-  //           forceRefresh: true, // 🔥 Force to run AI
-  //           enableAI: true,
-  //         })
-  //       );
-  //     } else {
-  //       console.log("✅ AI cache exists, using it...");
-  //       // Use existing AI cache
-  //       dispatch(
-  //         fetchInsightsDebounced({
-  //           forceRefresh: false,
-  //           enableAI: true,
-  //         })
-  //       );
-  //     }
-
-  //     setInsightsRequested(true);
-  //   }
-  // }, [
-  //   selectedAccount,
-  //   shouldLoadInsights,
-  //   insightsRequested,
-  //   loadingTotals,
-  //   dispatch,
-  //   dateFilter,
-  //   customDateRange,
-  //   insightsCache,
-  // ]);
-
   // 🔥 SIMPLIFIED: Use existing Redux loadingTotals state
   useEffect(() => {
-    if (
-      selectedAccount &&
-      shouldLoadInsights &&
-      !insightsRequested &&
-      !loadingTotals
-    ) {
+    if (selectedAccount && !insightsRequested && !loadingTotals) {
       console.log("🔄 AdvanceAnalytics: Loading insights for", selectedAccount);
 
-      // Generate AI cache key
-      const aiCacheKey = `${selectedAccount}_${dateFilter}_${
-        customDateRange.since || "none"
-      }_${customDateRange.until || "none"}_AI_ON`;
-      const hasAICache = insightsCache && insightsCache[aiCacheKey];
+      // // Generate AI cache key
+      // const aiCacheKey = `${selectedAccount}_${dateFilter}_${
+      //   customDateRange.since || "none"
+      // }_${customDateRange.until || "none"}_AI_ON`;
+      // const hasAICache = insightsCache && insightsCache[aiCacheKey];
 
       console.log(
         "🔍 AI Cache check:",
-        hasAICache ? "✅ FOUND" : "❌ NOT FOUND"
+        hasValidCache ? "✅ FOUND" : "❌ NOT FOUND"
       );
 
-      if (!hasAICache) {
+      if (!hasValidCache) {
         console.log("⚠️ No AI cache, running AI analysis...");
 
         // 🔥 Show toast for long-running AI
@@ -321,13 +288,12 @@ const AdvanceAnalyticsPage: React.FC = () => {
     }
   }, [
     selectedAccount,
-    shouldLoadInsights,
     insightsRequested,
     loadingTotals,
     dispatch,
     dateFilter,
     customDateRange,
-    insightsCache,
+    hasValidCache,
     toast,
   ]);
 
@@ -335,6 +301,13 @@ const AdvanceAnalyticsPage: React.FC = () => {
   useEffect(() => {
     return () => {
       console.log("📍 Leaving AdvanceAnalytics - resetting insights state");
+      setInsightsRequested(false);
+    };
+  }, []);
+  // 🔥 Reset on unmount
+  useEffect(() => {
+    return () => {
+      console.log("📍 AdvanceAnalytics unmounting");
       setInsightsRequested(false);
     };
   }, []);
@@ -535,6 +508,20 @@ const AdvanceAnalyticsPage: React.FC = () => {
       }
     };
   }, []);
+
+  // 🔥 ADD THIS: Detect AI running based on loading state
+  useEffect(() => {
+    // Assume AI is running if loading takes more than 2 seconds
+    if (loadingTotals) {
+      const timer = setTimeout(() => {
+        setIsAIRunning(true);
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    } else {
+      setIsAIRunning(false);
+    }
+  }, [loadingTotals]);
 
   // 🔥 NEW: Pagination handlers
   const handlePageChange = (page: number) => {
@@ -820,278 +807,284 @@ const AdvanceAnalyticsPage: React.FC = () => {
     return filteredCampaigns;
   };
 
-  const handleExportData = async (options: ExportOptions) => {
-    try {
-      setIsExporting(true);
-      console.log("🚀 ========== EXPORT STARTED ==========");
-      console.log("📋 Export options:", options);
+  // const handleExportData = async (options: ExportOptions) => {
+  //   try {
+  //     setIsExporting(true);
+  //     console.log("🚀 ========== EXPORT STARTED ==========");
+  //     console.log("📋 Export options:", options);
 
-      if (!selectedAccount) {
-        console.error("❌ No ad account selected");
-        toast({
-          title: "Error",
-          description: "Please select an ad account first.",
-          variant: "destructive",
-        });
-        return;
-      }
+  //     if (!selectedAccount) {
+  //       console.error("❌ No ad account selected");
+  //       toast({
+  //         title: "Error",
+  //         description: "Please select an ad account first.",
+  //         variant: "destructive",
+  //       });
+  //       return;
+  //     }
 
-      const filteredCampaigns = getFilteredCampaigns();
-      console.log(`📊 Filtered campaigns count: ${filteredCampaigns.length}`);
-      console.log(
-        "📊 Campaign Analysis available:",
-        campaignAnalysis?.length || 0
-      );
+  //     const filteredCampaigns = getFilteredCampaigns();
+  //     console.log(`📊 Filtered campaigns count: ${filteredCampaigns.length}`);
+  //     console.log(
+  //       "📊 Campaign Analysis available:",
+  //       campaignAnalysis?.length || 0
+  //     );
+  //     toast({
+  //       title: "Analyzing",
+  //       description: `Analyzing all campaign it may take some time!`,
+  //       variant: "info",
+  //     });
 
-      if (filteredCampaigns.length === 0) {
-        console.error("❌ No campaigns to export");
-        toast({
-          title: "Error",
-          description: "No campaigns available to export.",
-          variant: "destructive",
-        });
-        return;
-      }
+  //     if (filteredCampaigns.length === 0) {
+  //       console.error("❌ No campaigns to export");
+  //       toast({
+  //         title: "Error",
+  //         description: "No campaigns available to export.",
+  //         variant: "destructive",
+  //       });
+  //       return;
+  //     }
 
-      console.log("🔄 Starting campaign data mapping...");
+  //     console.log("🔄 Starting campaign data mapping...");
 
-      // 🔥 Map campaigns with full data from Redux
-      const campaignsToExport = filteredCampaigns.map(
-        (campaign: any, index: number) => {
-          console.log(
-            `\n--- Campaign ${index + 1}/${filteredCampaigns.length}: ${
-              campaign.name
-            } ---`
-          );
+  //     // 🔥 Map campaigns with full data from Redux
+  //     const campaignsToExport = filteredCampaigns.map(
+  //       (campaign: any, index: number) => {
+  //         console.log(
+  //           `\n--- Campaign ${index + 1}/${filteredCampaigns.length}: ${
+  //             campaign.name
+  //           } ---`
+  //         );
 
-          // Find matching campaign WITH insights and AI/verdict data
-          const fullCampaignData = campaignAnalysis?.find(
-            (c: any) => c.id === campaign.id
-          );
+  //         // Find matching campaign WITH insights and AI/verdict data
+  //         const fullCampaignData = campaignAnalysis?.find(
+  //           (c: any) => c.id === campaign.id
+  //         );
 
-          if (!fullCampaignData) {
-            console.warn(`⚠️ No full data for campaign: ${campaign.name}`);
-            return {
-              id: campaign.id,
-              name: campaign.name,
-              status: campaign.status,
-              objective: campaign.objective,
-              start_time: campaign.start_time,
-              stop_time: campaign.stop_time,
-            };
-          }
+  //         if (!fullCampaignData) {
+  //           console.warn(`⚠️ No full data for campaign: ${campaign.name}`);
+  //           return {
+  //             id: campaign.id,
+  //             name: campaign.name,
+  //             status: campaign.status,
+  //             objective: campaign.objective,
+  //             start_time: campaign.start_time,
+  //             stop_time: campaign.stop_time,
+  //           };
+  //         }
 
-          // Check data availability - STRICT checks!
-          const hasAIVerdict =
-            fullCampaignData.ai_verdict !== undefined &&
-            fullCampaignData.ai_verdict !== null &&
-            fullCampaignData.ai_verdict !== "";
+  //         // Check data availability - STRICT checks!
+  //         const hasAIVerdict =
+  //           fullCampaignData.ai_verdict !== undefined &&
+  //           fullCampaignData.ai_verdict !== null &&
+  //           fullCampaignData.ai_verdict !== "";
 
-          const hasRuleVerdict =
-            fullCampaignData.verdict !== undefined &&
-            fullCampaignData.verdict !== null;
+  //         const hasRuleVerdict =
+  //           fullCampaignData.verdict !== undefined &&
+  //           fullCampaignData.verdict !== null;
 
-          const hasMetrics = !!fullCampaignData.totals;
+  //         const hasMetrics = !!fullCampaignData.totals;
 
-          console.log("  ✅ Full data found!");
-          console.log("  📊 Has Metrics:", hasMetrics);
-          console.log("  🤖 Has AI Verdict:", hasAIVerdict);
-          console.log("  📋 Has Rule Verdict:", hasRuleVerdict);
+  //         console.log("  ✅ Full data found!");
+  //         console.log("  📊 Has Metrics:", hasMetrics);
+  //         console.log("  🤖 Has AI Verdict:", hasAIVerdict);
+  //         console.log("  📋 Has Rule Verdict:", hasRuleVerdict);
 
-          // Log actual values for debugging
-          if (hasAIVerdict) {
-            console.log("  🤖 AI Verdict value:", fullCampaignData.ai_verdict);
-          }
+  //         // Log actual values for debugging
+  //         if (hasAIVerdict) {
+  //           console.log("  🤖 AI Verdict value:", fullCampaignData.ai_verdict);
+  //         }
 
-          if (hasRuleVerdict) {
-            console.log("  📋 Rule Verdict value:", fullCampaignData.verdict);
-          }
+  //         if (hasRuleVerdict) {
+  //           console.log("  📋 Rule Verdict value:", fullCampaignData.verdict);
+  //         }
 
-          // Build export object
-          const campaignData = fullCampaignData as any;
-          const exportData: any = {
-            id: campaignData.id,
-            name: campaignData.name,
-            status: campaignData.status,
-            objective: campaignData.objective,
-            start_time: campaignData.start_time,
-            stop_time: campaignData.stop_time,
-            daily_budget: campaignData.daily_budget,
-            lifetime_budget: campaignData.lifetime_budget,
+  //         // Build export object
+  //         const campaignData = fullCampaignData as any;
+  //         const exportData: any = {
+  //           id: campaignData.id,
+  //           name: campaignData.name,
+  //           status: campaignData.status,
+  //           objective: campaignData.objective,
+  //           start_time: campaignData.start_time,
+  //           stop_time: campaignData.stop_time,
+  //           daily_budget: campaignData.daily_budget,
+  //           lifetime_budget: campaignData.lifetime_budget,
 
-            // Include ALL totals/metrics
-            totals: campaignData.totals,
+  //           // Include ALL totals/metrics
+  //           totals: campaignData.totals,
 
-            // Include KPI fields from totals if available
-            totalSpend: campaignData.totals?.spend || 0,
-            totalImpressions: campaignData.totals?.impressions || 0,
-            totalClicks: campaignData.totals?.clicks || 0,
-            totalReach: campaignData.totals?.reach || 0,
-            avgCTR: campaignData.totals?.ctr || 0,
-            avgCPM: campaignData.totals?.cpm || 0,
-            avgCPC: campaignData.totals?.cpc || 0,
-            totalPurchases: campaignData.totals?.actions?.purchase || 0,
-            totalAddToCart: campaignData.totals?.actions?.add_to_cart || 0,
-            totalConversions: campaignData.totals?.total_conversions || 0,
-          };
+  //           // Include KPI fields from totals if available
+  //           totalSpend: campaignData.totals?.spend || 0,
+  //           totalImpressions: campaignData.totals?.impressions || 0,
+  //           totalClicks: campaignData.totals?.clicks || 0,
+  //           totalReach: campaignData.totals?.reach || 0,
+  //           avgCTR: campaignData.totals?.ctr || 0,
+  //           avgCPM: campaignData.totals?.cpm || 0,
+  //           avgCPC: campaignData.totals?.cpc || 0,
+  //           totalPurchases: campaignData.totals?.actions?.purchase || 0,
+  //           totalAddToCart: campaignData.totals?.actions?.add_to_cart || 0,
+  //           totalConversions: campaignData.totals?.total_conversions || 0,
+  //         };
 
-          // 🔥 Add AI verdict if truly available
-          if (hasAIVerdict) {
-            console.log("  ✅ Adding AI verdict to export");
-            exportData.aiverdict = campaignData.ai_verdict;
-            exportData.aianalysis =
-              campaignData.ai_analysis || "No analysis available";
-            exportData.airecommendations =
-              campaignData.ai_recommendations ||
-              "No recommendations available";
-            console.log("  📤 AI Verdict exported:", exportData.aiverdict);
-          }
-          // 🔥 FALLBACK: Use rule-based verdict
-          else if (hasRuleVerdict) {
-            console.log("  ✅ Using rule verdict as AI verdict for export");
+  //         // 🔥 Add AI verdict if truly available
+  //         if (hasAIVerdict) {
+  //           console.log("  ✅ Adding AI verdict to export");
+  //           exportData.aiverdict = campaignData.ai_verdict;
+  //           exportData.aianalysis =
+  //             campaignData.ai_analysis || "No analysis available";
+  //           exportData.airecommendations =
+  //             campaignData.ai_recommendations || "No recommendations available";
+  //           console.log("  📤 AI Verdict exported:", exportData.aiverdict);
+  //         }
+  //         // 🔥 FALLBACK: Use rule-based verdict
+  //         else if (hasRuleVerdict) {
+  //           console.log("  ✅ Using rule verdict as AI verdict for export");
 
-            const verdictCategory =
-              campaignData.verdict?.category || "unknown";
-            const verdictDescription =
-              campaignData.verdict?.description ||
-              "Performance level: unknown";
+  //           const verdictCategory = campaignData.verdict?.category || "unknown";
+  //           const verdictDescription =
+  //             campaignData.verdict?.description || "Performance level: unknown";
 
-            exportData.aiverdict = verdictDescription;
-            exportData.aianalysis = `Rule-based analysis: This campaign is classified as "${verdictCategory}". ${verdictDescription}. Based on current metrics, this campaign requires attention.`;
-            exportData.airecommendations = `Review campaign ${
-              verdictCategory === "underperforming" ? "urgently" : "regularly"
-            } and consider optimization strategies such as adjusting targeting, creative, or budget allocation.`;
+  //           exportData.aiverdict = verdictDescription;
+  //           exportData.aianalysis = `Rule-based analysis: This campaign is classified as "${verdictCategory}". ${verdictDescription}. Based on current metrics, this campaign requires attention.`;
+  //           exportData.airecommendations = `Review campaign ${
+  //             verdictCategory === "underperforming" ? "urgently" : "regularly"
+  //           } and consider optimization strategies such as adjusting targeting, creative, or budget allocation.`;
 
-            console.log("  📤 Rule Verdict exported:", exportData.aiverdict);
-          } else {
-            console.warn("  ⚠️ NO VERDICT DATA AVAILABLE!");
-            console.warn(
-              "  🔍 Available keys:",
-              Object.keys(campaignData).join(", ")
-            );
+  //           console.log("  📤 Rule Verdict exported:", exportData.aiverdict);
+  //         } else {
+  //           console.warn("  ⚠️ NO VERDICT DATA AVAILABLE!");
+  //           console.warn(
+  //             "  🔍 Available keys:",
+  //             Object.keys(campaignData).join(", ")
+  //           );
 
-            // Fallback for no verdict
-            exportData.aiverdict = "No verdict available";
-            exportData.aianalysis = "Insufficient data for analysis";
-            exportData.airecommendations =
-              "Ensure campaign has sufficient data and is properly configured";
-          }
+  //           // Fallback for no verdict
+  //           exportData.aiverdict = "No verdict available";
+  //           exportData.aianalysis = "Insufficient data for analysis";
+  //           exportData.airecommendations =
+  //             "Ensure campaign has sufficient data and is properly configured";
+  //         }
 
-          // Include verdict object for backend reference
-          if (hasRuleVerdict) {
-            exportData.verdict = campaignData.verdict;
-          }
+  //         // Include verdict object for backend reference
+  //         if (hasRuleVerdict) {
+  //           exportData.verdict = campaignData.verdict;
+  //         }
 
-          return exportData;
-        }
-      );
+  //         return exportData;
+  //       }
+  //     );
 
-      // Summary logs
-      const campaignsWithMetrics = campaignsToExport.filter((c) => c.totals);
-      const campaignsWithVerdict = campaignsToExport.filter(
-        (c) => c.aiverdict && c.aiverdict !== "No verdict available"
-      );
+  //     // Summary logs
+  //     const campaignsWithMetrics = campaignsToExport.filter((c) => c.totals);
+  //     const campaignsWithVerdict = campaignsToExport.filter(
+  //       (c) => c.aiverdict && c.aiverdict !== "No verdict available"
+  //     );
 
-      console.log("\n📊 ========== EXPORT SUMMARY ==========");
-      console.log(`  Total campaigns: ${campaignsToExport.length}`);
-      console.log(`  With metrics: ${campaignsWithMetrics.length}`);
-      console.log(`  With verdict: ${campaignsWithVerdict.length}`);
-      console.log("======================================\n");
+  //     console.log("\n📊 ========== EXPORT SUMMARY ==========");
+  //     console.log(`  Total campaigns: ${campaignsToExport.length}`);
+  //     console.log(`  With metrics: ${campaignsWithMetrics.length}`);
+  //     console.log(`  With verdict: ${campaignsWithVerdict.length}`);
+  //     console.log("======================================\n");
 
-      // Build payload
-      const exportPayload = {
-        campaigns: campaignsToExport,
-        adAccountId: selectedAccount,
-        adAccountName:
-          adAccounts.find((acc) => acc.id === selectedAccount)?.name ||
-          selectedAccount,
-        date_start: dateRangeStart || undefined,
-        date_stop: dateRangeEnd || undefined,
-        exportOptions: options,
-      };
+  //     // Build payload
+  //     const exportPayload = {
+  //       campaigns: campaignsToExport,
+  //       adAccountId: selectedAccount,
+  //       adAccountName:
+  //         adAccounts.find((acc) => acc.id === selectedAccount)?.name ||
+  //         selectedAccount,
+  //       date_start: dateRangeStart || undefined,
+  //       date_stop: dateRangeEnd || undefined,
+  //       exportOptions: options,
+  //     };
+  //     toast({
+  //       title: "Generating",
+  //       description: `Generating Excel file it may take some time!`,
+  //       variant: "info",
+  //     });
+  //     console.log("📤 Sending export request to backend...");
+  //     console.log("  Account:", exportPayload.adAccountName);
+  //     console.log("  Campaigns:", exportPayload.campaigns.length);
+  //     console.log("  Options:", exportPayload.exportOptions);
 
-      console.log("📤 Sending export request to backend...");
-      console.log("  Account:", exportPayload.adAccountName);
-      console.log("  Campaigns:", exportPayload.campaigns.length);
-      console.log("  Options:", exportPayload.exportOptions);
+  //     const response = await fetch(
+  //       `${
+  //         import.meta.env.VITE_INTEREST_MINER_API_URL
+  //       }/api/export-filtered-campaigns`,
+  //       {
+  //         method: "POST",
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //           Authorization: `Bearer ${localStorage.getItem("token")}`,
+  //         },
+  //         body: JSON.stringify(exportPayload),
+  //       }
+  //     );
 
-      const response = await fetch(
-        `${
-          import.meta.env.VITE_INTEREST_MINER_API_URL
-        }/api/export-filtered-campaigns`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(exportPayload),
-        }
-      );
+  //     console.log("📥 Response status:", response.status);
 
-      console.log("📥 Response status:", response.status);
+  //     if (!response.ok) {
+  //       let errorMessage = "Export failed";
+  //       const contentType = response.headers.get("content-type");
 
-      if (!response.ok) {
-        let errorMessage = "Export failed";
-        const contentType = response.headers.get("content-type");
+  //       if (contentType && contentType.includes("application/json")) {
+  //         try {
+  //           const errorData = await response.json();
+  //           errorMessage = errorData.error || errorMessage;
+  //           console.error("❌ Backend error (JSON):", errorData);
+  //         } catch (e) {
+  //           console.error("Failed to parse error response:", e);
+  //         }
+  //       } else {
+  //         const text = await response.text();
+  //         console.error("❌ Backend error (HTML):", text.substring(0, 500));
+  //         errorMessage = `Server error (${response.status})`;
+  //       }
 
-        if (contentType && contentType.includes("application/json")) {
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.error || errorMessage;
-            console.error("❌ Backend error (JSON):", errorData);
-          } catch (e) {
-            console.error("Failed to parse error response:", e);
-          }
-        } else {
-          const text = await response.text();
-          console.error("❌ Backend error (HTML):", text.substring(0, 500));
-          errorMessage = `Server error (${response.status})`;
-        }
+  //       throw new Error(errorMessage);
+  //     }
 
-        throw new Error(errorMessage);
-      }
+  //     // Download the file
+  //     const blob = await response.blob();
+  //     const url = window.URL.createObjectURL(blob);
+  //     const a = document.createElement("a");
+  //     a.style.display = "none";
+  //     a.href = url;
 
-      // Download the file
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.style.display = "none";
-      a.href = url;
+  //     const contentDisposition = response.headers.get("Content-Disposition");
+  //     const filename = contentDisposition
+  //       ? contentDisposition.split("filename=")[1]?.replace(/"/g, "")
+  //       : `MetaAdsExport_${new Date().toISOString().split("T")[0]}.xlsx`;
 
-      const contentDisposition = response.headers.get("Content-Disposition");
-      const filename = contentDisposition
-        ? contentDisposition.split("filename=")[1]?.replace(/"/g, "")
-        : `MetaAdsExport_${new Date().toISOString().split("T")[0]}.xlsx`;
+  //     a.download = filename;
+  //     document.body.appendChild(a);
+  //     a.click();
+  //     window.URL.revokeObjectURL(url);
+  //     document.body.removeChild(a);
 
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+  //     console.log("✅ Export successful! File:", filename);
+  //     console.log("🚀 ========== EXPORT COMPLETE ==========\n");
 
-      console.log("✅ Export successful! File:", filename);
-      console.log("🚀 ========== EXPORT COMPLETE ==========\n");
+  //     toast({
+  //       title: "Success",
+  //       description: `Successfully exported ${filteredCampaigns.length} campaigns!`,
+  //     });
+  //   } catch (error: any) {
+  //     console.error("❌ ========== EXPORT FAILED ==========");
+  //     console.error("Error:", error);
+  //     console.error("Stack:", error.stack);
 
-      toast({
-        title: "Success",
-        description: `Successfully exported ${filteredCampaigns.length} campaigns!`,
-      });
-    } catch (error: any) {
-      console.error("❌ ========== EXPORT FAILED ==========");
-      console.error("Error:", error);
-      console.error("Stack:", error.stack);
-
-      toast({
-        title: "Export Failed",
-        description: error.message || "An unexpected error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsExporting(false);
-      dispatch(closeExportModal());
-    }
-  };
+  //     toast({
+  //       title: "Export Failed",
+  //       description: error.message || "An unexpected error occurred",
+  //       variant: "destructive",
+  //     });
+  //   } finally {
+  //     setIsExporting(false);
+  //     dispatch(closeExportModal());
+  //   }
+  // };
 
   if (!hasActiveSubscription) {
     return (
@@ -1429,7 +1422,56 @@ const AdvanceAnalyticsPage: React.FC = () => {
     return (
       <AnimatePresence>
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 flex items-center justify-center relative overflow-hidden">
-          {/* Same background and floating elements as above */}
+          {/* Background Decorations */}
+          <div className="absolute inset-0 overflow-hidden">
+            {/* Animated gradient orbs */}
+            <motion.div
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.3, 0.5, 0.3],
+              }}
+              transition={{
+                duration: 8,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              className="absolute top-1/4 -left-1/4 w-96 h-96 bg-blue-400/30 dark:bg-blue-500/20 rounded-full blur-3xl"
+            />
+            <motion.div
+              animate={{
+                scale: [1.2, 1, 1.2],
+                opacity: [0.3, 0.5, 0.3],
+              }}
+              transition={{
+                duration: 8,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 1,
+              }}
+              className="absolute bottom-1/4 -right-1/4 w-96 h-96 bg-purple-400/30 dark:bg-purple-500/20 rounded-full blur-3xl"
+            />
+
+            {/* Floating particles */}
+            {[...Array(20)].map((_, i) => (
+              <motion.div
+                key={i}
+                initial={{
+                  x: Math.random() * window.innerWidth,
+                  y: Math.random() * window.innerHeight,
+                }}
+                animate={{
+                  y: [0, -30, 0],
+                  opacity: [0.2, 0.8, 0.2],
+                }}
+                transition={{
+                  duration: 3 + Math.random() * 2,
+                  repeat: Infinity,
+                  delay: Math.random() * 2,
+                }}
+                className="absolute w-2 h-2 bg-blue-500/20 dark:bg-blue-400/30 rounded-full"
+              />
+            ))}
+          </div>
 
           {/* Main Content for Facebook Connection */}
           <motion.div
@@ -1442,28 +1484,84 @@ const AdvanceAnalyticsPage: React.FC = () => {
               stiffness: 100,
             }}
             className="relative z-10 text-center max-w-4xl mx-auto p-8">
-            <div className="backdrop-blur-xl bg-white/80 dark:bg-gray-800/80 rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/30 p-10 relative overflow-hidden">
+            <div className="backdrop-blur-xl bg-white/90 dark:bg-gray-800/90 rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/50 p-10 relative overflow-hidden">
+              {/* Background gradient overlay */}
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-indigo-500/5 dark:from-blue-400/10 dark:to-indigo-400/10 rounded-3xl"></div>
 
               <div className="relative z-10">
+                {/* Icon */}
+                <motion.div
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: "spring", duration: 1, delay: 0.3 }}
+                  className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-xl mb-6">
+                  <svg
+                    className="w-10 h-10 text-white"
+                    viewBox="0 0 24 24"
+                    fill="currentColor">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                  </svg>
+                </motion.div>
+
+                {/* Title */}
                 <motion.h2
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.5 }}
-                  className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-400 dark:via-indigo-400 dark:to-purple-400 bg-clip-text text-transparent mb-3">
-                  Connect Meta & Access Premium Analytics 🚀
+                  className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-400 dark:via-indigo-400 dark:to-purple-400 bg-clip-text text-transparent mb-4">
+                  Connect Meta & Access Premium Analytics
                 </motion.h2>
 
+                {/* Description */}
                 <motion.p
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.6 }}
-                  className="text-gray-600 dark:text-gray-300 text-lg mb-8 leading-relaxed">
+                  className="text-gray-600 dark:text-gray-300 text-lg mb-8 leading-relaxed max-w-2xl mx-auto">
                   Your premium subscription is active! Connect Meta to unlock
                   advanced campaign analytics and AI-powered insights.
                 </motion.p>
 
-                {/* Same premium features preview as above */}
+                {/* Features Preview */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.7 }}
+                  className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                  {[
+                    {
+                      icon: "📊",
+                      title: "Advanced Analytics",
+                      desc: "Deep campaign insights",
+                    },
+                    {
+                      icon: "🤖",
+                      title: "AI Recommendations",
+                      desc: "Smart optimization tips",
+                    },
+                    {
+                      icon: "📈",
+                      title: "Real-time Data",
+                      desc: "Live performance tracking",
+                    },
+                  ].map((feature, idx) => (
+                    <motion.div
+                      key={idx}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.8 + idx * 0.1 }}
+                      whileHover={{ y: -5, scale: 1.05 }}
+                      className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-xl p-5 border border-blue-200 dark:border-blue-800/50">
+                      <div className="text-3xl mb-2">{feature.icon}</div>
+                      <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-1">
+                        {feature.title}
+                      </h3>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        {feature.desc}
+                      </p>
+                    </motion.div>
+                  ))}
+                </motion.div>
 
                 {/* Connect Facebook Button */}
                 <motion.button
@@ -1473,33 +1571,43 @@ const AdvanceAnalyticsPage: React.FC = () => {
                   whileHover={{
                     scale: 1.05,
                     boxShadow:
-                      "0 20px 25px -5px rgba(59, 130, 246, 0.3), 0 10px 10px -5px rgba(59, 130, 246, 0.1)",
+                      "0 20px 25px -5px rgba(59, 130, 246, 0.4), 0 10px 10px -5px rgba(59, 130, 246, 0.2)",
                   }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => router("/meta-campaign")}
-                  className="group relative w-full px-8 py-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-semibold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
+                  className="group relative w-full max-w-md mx-auto px-8 py-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white font-bold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden">
+                  {/* Shine effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
 
                   <div className="relative flex items-center justify-center space-x-3">
                     <svg
-                      className="w-5 h-5"
+                      className="w-6 h-6"
                       viewBox="0 0 24 24"
                       fill="currentColor">
                       <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                     </svg>
                     <span className="text-lg">Connect Meta Account</span>
                     <motion.div
-                      animate={{ x: [0, 4, 0] }}
+                      animate={{ x: [0, 5, 0] }}
                       transition={{
                         duration: 1.5,
                         repeat: Infinity,
                         ease: "easeInOut",
                       }}
-                      className="ml-1">
+                      className="text-xl">
                       →
                     </motion.div>
                   </div>
                 </motion.button>
+
+                {/* Help Text */}
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1 }}
+                  className="mt-6 text-sm text-gray-500 dark:text-gray-400">
+                  Secure connection via Meta OAuth - Your data is encrypted
+                </motion.p>
               </div>
             </div>
           </motion.div>
@@ -1508,15 +1616,33 @@ const AdvanceAnalyticsPage: React.FC = () => {
     );
   }
 
+  // if (hasValidCache) {
+  //   return (
+  //     <AnimatePresence>
+  //       <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+  //         ✅ Showing cached AI analysis. Cache expires in{" "}
+  //         {(() => {
+  //           if (!aiCacheKey || !insightsCache[aiCacheKey]) return "0";
+  //           const cacheEntry = insightsCache[aiCacheKey];
+  //           const ageMs = Date.now() - cacheEntry.timestamp;
+  //           const remainingHours = 12 - ageMs / (60 * 60 * 1000);
+  //           return remainingHours.toFixed(1);
+  //         })()}{" "}
+  //         hours.
+  //       </div>
+  //     </AnimatePresence>
+  //   );
+  // }
+
   return (
     <>
       <AnimatePresence>
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
           <div className=" mx-auto space-y-6 py-8 px-4 sm:px-6 lg:px-8">
             {/* Header */}
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 shadow-lg">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-xl p-6 shadow-lg">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-                <div>
+                <div className="flex-1">
                   <h1 className="text-2xl font-bold text-white mb-2">
                     Advanced Campaign Analytics
                   </h1>
@@ -1524,50 +1650,92 @@ const AdvanceAnalyticsPage: React.FC = () => {
                     <p className="text-indigo-100">
                       Comprehensive insights into your Meta Ads performance
                     </p>
-                    {loadingTotals && (
-                      <div className="text-xs bg-white/20 px-2 py-1 rounded-full text-indigo-100">
-                        Loading insights...
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Add this Account Selector after your filters and before the analytics dashboard */}
+            {/* Connected Account Selector - No gap, rounded bottom */}
             {hasFacebookConnection && (
-              <div className="mb-6">
-                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                    Select Ad Account
-                  </h3>
+              <div className="bg-white dark:bg-gray-800 rounded-b-xl p-6 shadow-sm relative">
+                {/* Shimmer overlay when loading */}
+                {adAccounts.length === 0 && (
+                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 dark:via-white/5 to-transparent"></div>
+                )}
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-3 sm:space-y-0">
                   {adAccounts.length === 0 ? (
-                    <div className="text-center py-4">
-                      <p className="text-gray-500 dark:text-gray-400">
-                        Fetching your Meta ad accounts...
-                      </p>
+                    // Skeleton Loading State
+                    <div className="space-y-2 flex-1">
+                      {/* Skeleton label */}
+                      <div className="flex items-center space-x-2">
+                        <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                        <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      </div>
+
+                      {/* Skeleton dropdown */}
+                      <div className="relative">
+                        <div className="w-full h-14 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded-xl animate-pulse"></div>
+
+                        {/* Spinner overlay */}
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center space-x-2">
+                          <svg
+                            className="animate-spin h-4 w-4 text-gray-500 dark:text-gray-400"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24">
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                          </svg>
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                            Fetching accounts...
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   ) : (
-                    <select
-                      value={selectedAccount || ""}
-                      onChange={(e) => handleAccountChange(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                      <option value="">Select an account</option>
-                      {adAccounts.map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {account.name} (ID: {account.id})
-                          {insightsLastUpdated[account.id] &&
-                            ` - Updated: ${new Date(
-                              insightsLastUpdated[account.id]
-                            ).toLocaleTimeString()}`}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  {!selectedAccount && adAccounts.length > 0 && (
-                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                      Please select an ad account to view analytics.
-                    </p>
+                    // Real Custom Dropdown
+                    <div className="flex-1">
+                      <CustomDropdown
+                        label="Ad Account"
+                        options={adAccounts.map((acc) => ({
+                          id: acc.id,
+                          name: acc.name,
+                        }))}
+                        value={selectedAccount}
+                        onChange={handleAccountChange}
+                        placeholder="Select an ad account"
+                        isDarkMode={isDarkMode}
+                        colorScheme="purple"
+                      />
+
+                      {!selectedAccount && (
+                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center space-x-1">
+                          <svg
+                            className="w-3 h-3"
+                            fill="currentColor"
+                            viewBox="0 0 20 20">
+                            <path
+                              fillRule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          <span>
+                            Please select an ad account to view analytics
+                          </span>
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -1576,20 +1744,118 @@ const AdvanceAnalyticsPage: React.FC = () => {
             {/* Content */}
             <div className="p-6">
               {loadingTotals ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600 dark:text-gray-400">
-                      Loading analytics data...
-                    </p>
+                <div className="space-y-6">
+                  {/* Clean Loading Message */}
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-center space-x-3">
+                      <div className="relative">
+                        <div className="w-12 h-12 border-4 border-indigo-200 dark:border-indigo-900 rounded-full"></div>
+                        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          Analyzing Your Campaigns
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Please wait while we process your data...
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  {/* Shimmer Skeleton Cards - Premium Version */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {[1, 2, 3, 4].map((i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                        className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden relative">
+                        {/* Shimmer overlay */}
+                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+
+                        <div className="space-y-4">
+                          {/* Icon + Badge */}
+                          <div className="flex items-center justify-between">
+                            <div className="w-12 h-12 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-lg animate-pulse"></div>
+                            <div className="w-20 h-7 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-full animate-pulse"></div>
+                          </div>
+
+                          {/* Text lines */}
+                          <div className="space-y-3">
+                            <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded w-2/3 animate-pulse"></div>
+                            <div className="h-8 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded w-1/2 animate-pulse"></div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
                   </div>
+
+                  {/* Shimmer Skeleton Table - Premium Version */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                    className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden relative">
+                    {/* Shimmer overlay */}
+                    <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+
+                    <div className="p-6 space-y-6">
+                      {/* Table Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="h-7 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded w-48 animate-pulse"></div>
+                        <div className="h-10 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded w-32 animate-pulse"></div>
+                      </div>
+
+                      {/* Table Rows */}
+                      <div className="space-y-3">
+                        {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                          <div key={i} className="flex items-center space-x-4">
+                            {/* Checkbox */}
+                            <div className="w-5 h-5 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded animate-pulse"></div>
+
+                            {/* Campaign Name */}
+                            <div
+                              className="h-4 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded animate-pulse"
+                              style={{
+                                width: `${Math.random() * 40 + 30}%`,
+                              }}></div>
+
+                            {/* Metrics */}
+                            <div className="flex-1 flex justify-end space-x-4">
+                              <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded w-16 animate-pulse"></div>
+                              <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded w-20 animate-pulse"></div>
+                              <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded w-20 animate-pulse"></div>
+                              <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded w-24 animate-pulse"></div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Pagination skeleton */}
+                      <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <div className="h-10 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 rounded w-32 animate-pulse"></div>
+                        <div className="flex space-x-2">
+                          {[1, 2, 3].map((i) => (
+                            <div
+                              key={i}
+                              className="w-10 h-10 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded animate-pulse"></div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
                 </div>
               ) : (
                 <>
                   <div className="space-y-8">
                     {/* Overall Performance Stats */}
                     {statsCards.length > 0 && (
-                      <div>
+                      <div className="mb-8">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                           <ChartBarIcon className="mr-2 text-indigo-600 h-5 w-5" />
                           Overall Performance
@@ -1597,25 +1863,39 @@ const AdvanceAnalyticsPage: React.FC = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {statsCards.map((card, index) => (
                             <motion.div
-                              key={card.title}
+                              key={card.title} // 🔥 Stable key
+                              layoutId={`stat-card-${card.title}`} // 🔥 Prevents flicker
                               initial={{ opacity: 0, y: 20 }}
                               animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: index * 0.1 }}
-                              className={`${card.bgColor} backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl p-4`}>
-                              <div className="flex items-center justify-between mb-3">
-                                <div
-                                  className={`p-2 rounded-lg bg-gradient-to-r ${card.color}`}>
-                                  <card.icon className="h-5 w-5 text-white" />
+                              transition={{
+                                delay: index * 0.05,
+                                duration: 0.3,
+                                ease: "easeOut",
+                                layout: { duration: 0.3 }, // 🔥 Smooth layout changes
+                              }}
+                              className={`${card.bgColor} backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm hover:shadow-xl transition-shadow duration-300 cursor-pointer group relative overflow-hidden`}>
+                              {/* 🔥 Subtle gradient overlay */}
+                              <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none"></div>
+
+                              <div className="relative z-10">
+                                <div className="flex items-center justify-between mb-4">
+                                  <motion.div
+                                    layoutId={`icon-${card.title}`} // 🔥 Smooth icon transitions
+                                    className={`p-3 rounded-lg bg-gradient-to-br ${card.color} shadow-md group-hover:shadow-lg transition-shadow duration-300`}>
+                                    <card.icon className="h-6 w-6 text-white" />
+                                  </motion.div>
                                 </div>
-                              </div>
-                              <div>
-                                <p className="text-gray-600 dark:text-gray-400 text-sm font-medium mb-1">
-                                  {card.title}
-                                </p>
-                                <p
-                                  className={`text-xl font-bold ${card.textColor}`}>
-                                  {card.value}
-                                </p>
+
+                                <div>
+                                  <p className="text-gray-600 dark:text-gray-400 text-sm font-medium mb-2 uppercase tracking-wide">
+                                    {card.title}
+                                  </p>
+                                  <motion.p
+                                    layoutId={`value-${card.title}`} // 🔥 Smooth value transitions
+                                    className={`text-3xl font-bold ${card.textColor}`}>
+                                    {card.value}
+                                  </motion.p>
+                                </div>
                               </div>
                             </motion.div>
                           ))}
@@ -1625,7 +1905,7 @@ const AdvanceAnalyticsPage: React.FC = () => {
 
                     {/* Action Stats */}
                     {actionStats.length > 0 && (
-                      <div>
+                      <div className="mb-8">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                           <BanknotesIcon className="mr-2 text-green-600 h-5 w-5" />
                           Conversion Actions
@@ -1634,354 +1914,153 @@ const AdvanceAnalyticsPage: React.FC = () => {
                           {actionStats.map((stat, index) => (
                             <motion.div
                               key={stat.title}
+                              layoutId={`action-stat-${stat.title}`} // 🔥 Prevents flicker
                               initial={{ opacity: 0, scale: 0.9 }}
                               animate={{ opacity: 1, scale: 1 }}
-                              transition={{ delay: index * 0.05 }}
-                              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-center">
-                              <div
-                                className={`w-8 h-8 ${stat.color} rounded-lg flex items-center justify-center mx-auto mb-2`}>
-                                <stat.icon className="h-4 w-4 text-white" />
+                              transition={{
+                                delay: index * 0.05,
+                                duration: 0.3,
+                                ease: "easeOut",
+                                layout: { duration: 0.3 }, // 🔥 Smooth layout changes
+                              }}
+                              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 text-center shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer group relative overflow-hidden">
+                              {/* 🔥 Subtle gradient overlay */}
+                              <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none"></div>
+
+                              {/* 🔥 Animated shine effect on hover */}
+                              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none"></div>
+
+                              <div className="relative z-10">
+                                {/* Icon */}
+                                <motion.div
+                                  layoutId={`action-icon-${stat.title}`} // 🔥 Smooth icon transitions
+                                  className={`w-10 h-10 ${stat.color} rounded-lg flex items-center justify-center mx-auto mb-3 shadow-md group-hover:shadow-lg group-hover:scale-110 transition-all duration-300`}>
+                                  <stat.icon className="h-5 w-5 text-white" />
+                                </motion.div>
+
+                                {/* Value */}
+                                <motion.p
+                                  layoutId={`action-value-${stat.title}`} // 🔥 Smooth value transitions
+                                  className="text-xl font-bold text-gray-900 dark:text-white mb-1">
+                                  {stat.value}
+                                </motion.p>
+
+                                {/* Title */}
+                                <p className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide font-medium">
+                                  {stat.title}
+                                </p>
                               </div>
-                              <p className="text-lg font-bold text-gray-900 dark:text-white">
-                                {stat.value}
-                              </p>
-                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                                {stat.title}
-                              </p>
                             </motion.div>
                           ))}
                         </div>
                       </div>
                     )}
-
                     {/* 🔥 NEW: Categories with your existing styling */}
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                        <FunnelIcon className="mr-2 text-purple-600 h-5 w-5" />
-                        Campaign Categories
-                      </h3>
-                      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
-                        {categories.map((category) => (
-                          <button
-                            key={category.id}
-                            onClick={() => setSelectedCategory(category.id)}
-                            className={`p-4 rounded-lg border transition-all ${
-                              selectedCategory === category.id
-                                ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
-                                : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600"
-                            }`}>
-                            <category.icon
-                              className={`h-6 w-6 ${category.color} mx-auto mb-2`}
-                            />
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              {category.name}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                              {category.count} campaigns
-                            </p>
-                          </button>
-                        ))}
-                      </div>
+                    <div className="mb-8">
+                      {/* Campaign Categories */}
+                      <div className="mb-6">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                          <FunnelIcon className="mr-2 text-purple-600 h-5 w-5" />
+                          Campaign Categories
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                          {categories.map((category, index) => (
+                            <motion.button
+                              key={category.id}
+                              layoutId={`category-${category.id}`}
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{
+                                delay: index * 0.05,
+                                duration: 0.3,
+                                ease: "easeOut",
+                              }}
+                              whileHover={{ y: -2 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => setSelectedCategory(category.id)}
+                              className={`p-4 rounded-xl border-2 transition-all duration-300 shadow-sm hover:shadow-md relative overflow-hidden group ${
+                                selectedCategory === category.id
+                                  ? "border-indigo-500 bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/30 dark:to-indigo-800/20 shadow-indigo-200 dark:shadow-indigo-900/50"
+                                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700"
+                              }`}>
+                              {/* Shine effect */}
+                              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none"></div>
 
-                      {/* Filters - using your existing grid layout */}
-                      {/* Filters - using your existing grid layout */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
-                        {/* Search */}
-                        <div className="relative">
-                          <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                          <input
-                            type="text"
-                            placeholder="Search campaigns..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-full"
-                          />
-                        </div>
+                              <div className="relative z-10">
+                                {/* Icon */}
+                                <div
+                                  className={`h-8 w-8 mx-auto mb-2 transition-transform duration-300 ${
+                                    selectedCategory === category.id
+                                      ? "scale-110"
+                                      : "group-hover:scale-110"
+                                  }`}>
+                                  <category.icon
+                                    className={`h-8 w-8 ${category.color}`}
+                                  />
+                                </div>
 
-                        {/* Status Filter */}
-                        <select
-                          value={statusFilter}
-                          onChange={(e) => setStatusFilter(e.target.value)}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                          <option value="all">All Status</option>
-                          <option value="active">Active</option>
-                          <option value="paused">Paused</option>
-                          <option value="archived">Archived</option>
-                        </select>
+                                {/* Name */}
+                                <p
+                                  className={`text-sm font-semibold mb-1 transition-colors ${
+                                    selectedCategory === category.id
+                                      ? "text-indigo-700 dark:text-indigo-300"
+                                      : "text-gray-900 dark:text-white"
+                                  }`}>
+                                  {category.name}
+                                </p>
 
-                        {/* Objective Filter */}
-                        <select
-                          value={objectiveFilter}
-                          onChange={(e) => setObjectiveFilter(e.target.value)}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                          <option value="all">All Objectives</option>
-                          <option value="outcome_leads">Leads</option>
-                          <option value="outcome_awareness">Awareness</option>
-                          <option value="outcome_engagement">Engagement</option>
-                          <option value="outcome_sales">Sales</option>
-                        </select>
+                                {/* Count Badge */}
+                                <div
+                                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                                    selectedCategory === category.id
+                                      ? "bg-indigo-200 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-200"
+                                      : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                                  }`}>
+                                  {category.count}{" "}
+                                  {category.count === 1
+                                    ? "campaign"
+                                    : "campaigns"}
+                                </div>
 
-                        {/* Date Range */}
-                        <input
-                          type="date"
-                          value={dateRangeStart}
-                          onChange={(e) => setDateRangeStart(e.target.value)}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                          placeholder="Start Date"
-                        />
-
-                        <input
-                          type="date"
-                          value={dateRangeEnd}
-                          onChange={(e) => setDateRangeEnd(e.target.value)}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                          placeholder="End Date"
-                        />
-
-                        {/* <div className="flex gap-2">
-                      
-                          <button
-                            onClick={handleForceRefresh}
-                            disabled={loading || !selectedAccount}
-                            className="flex items-center gap-2"
-                            title="Force refresh data (bypasses 12-hour cache)">
-                            <RefreshCw
-                              className={`h-4 w-4 ${
-                                loading ? "animate-spin" : ""
-                              }`}
-                            />
-                            Refresh
-                          </button>
-                        </div> */}
-                      </div>
-
-                      {/* 🔥 NEW: Pagination Info */}
-                      <div className="px-6 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-t-lg">
-                        <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-                          <span className="py-3">
-                            Showing {paginationData.startIndex + 1} to{" "}
-                            {paginationData.endIndex} of{" "}
-                            {paginationData.totalItems} campaigns
-                          </span>
-                          <div className="flex gap-3">
-                            <span className="py-3">
-                              Page {currentPage} of {paginationData.totalPages}
-                            </span>
-                            <button
-                              onClick={() => dispatch(openExportModal())}
-                              disabled={
-                                loading || filteredCampaigns.length === 0
-                              }
-                              className="hover:text-white hover:bg-slate-400 flex items-center gap-2 px-2 py-3 shadow-sm shadow-slate-300">
-                              <Download className="h-4 w-4" />
-                              Export Data ({filteredCampaigns.length})
-                            </button>
-                          </div>
+                                {/* Selected indicator */}
+                                {selectedCategory === category.id && (
+                                  <motion.div
+                                    layoutId="selected-category-indicator"
+                                    className="absolute top-2 right-2 w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center"
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    transition={{
+                                      type: "spring",
+                                      stiffness: 500,
+                                      damping: 30,
+                                    }}>
+                                    <svg
+                                      className="w-3 h-3 text-white"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor">
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={3}
+                                        d="M5 13l4 4L19 7"
+                                      />
+                                    </svg>
+                                  </motion.div>
+                                )}
+                              </div>
+                            </motion.button>
+                          ))}
                         </div>
                       </div>
 
-                      {/* Campaign Table */}
-                      {paginationData.currentPageCampaigns.length > 0 ? (
-                        <div className="overflow-x-scroll bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-t-0">
-                          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-                              <tr>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                  Campaign
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                  Status
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                  Objective
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                  Category
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                  Impressions
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                  Clicks
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                  CTR
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                  Spend
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                  Conversions
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                  Start Date
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                              {paginationData.currentPageCampaigns.map(
-                                (campaign: any, index: number) => (
-                                  <motion.tr
-                                    key={campaign.id}
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: index * 0.03 }}
-                                    onClick={() =>
-                                      handleCampaignClick(campaign)
-                                    }
-                                    className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200">
-                                    {/* Campaign Name */}
-                                    <td className="px-4 py-4">
-                                      <div className="text-sm font-medium text-gray-900 dark:text-white max-w-xs truncate">
-                                        {campaign.name}
-                                      </div>
-                                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                                        ID: {campaign.id}
-                                      </div>
-                                    </td>
-
-                                    {/* Status */}
-                                    <td className="px-4 py-4">
-                                      <div className="flex items-center space-x-2">
-                                        {getStatusIcon(campaign.status)}
-                                        <span
-                                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                                            campaign.status
-                                          )}`}>
-                                          {campaign.status}
-                                        </span>
-                                      </div>
-                                    </td>
-
-                                    {/* Objective */}
-                                    <td className="px-4 py-4">
-                                      <div className="text-sm text-gray-900 dark:text-white">
-                                        {campaign.objective?.replace(
-                                          "OUTCOME_",
-                                          ""
-                                        ) || "N/A"}
-                                      </div>
-                                    </td>
-
-                                    {/* Category */}
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                      {" "}
-                                      <span
-                                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${(() => {
-                                          const verdict =
-                                            campaign.ai_verdict ||
-                                            campaign.verdict?.category ||
-                                            "Not Analyzed";
-                                          if (verdict.includes("Excellent"))
-                                            return "bg-green-100 text-green-800";
-                                          if (
-                                            verdict.includes("Good") ||
-                                            verdict.includes("Stable")
-                                          )
-                                            return "bg-blue-100 text-blue-800";
-                                          if (
-                                            verdict.includes("Average") ||
-                                            verdict.includes("Moderate")
-                                          )
-                                            return "bg-yellow-100 text-yellow-800";
-                                          if (
-                                            verdict.includes("Needs") ||
-                                            verdict.includes("Underperforming")
-                                          )
-                                            return "bg-orange-100 text-orange-800";
-                                          if (verdict.includes("Poor"))
-                                            return "bg-red-100 text-red-800";
-                                          return "bg-gray-100 text-gray-800";
-                                        })()}`}>
-                                        {" "}
-                                        {campaign.ai_verdict ||
-                                          campaign.verdict?.category ||
-                                          "Not Analyzed"}{" "}
-                                      </span>{" "}
-                                    </td>
-
-                                    {/* Impressions */}
-                                    <td className="px-4 py-4">
-                                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                        {campaign.totals?.impressions?.toLocaleString() ||
-                                          "0"}
-                                      </div>
-                                    </td>
-
-                                    {/* Clicks */}
-                                    <td className="px-4 py-4">
-                                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                        {campaign.totals?.clicks?.toLocaleString() ||
-                                          "0"}
-                                      </div>
-                                    </td>
-
-                                    {/* CTR */}
-                                    <td className="px-4 py-4">
-                                      <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                                        {(campaign.totals?.ctr || 0).toFixed(2)}
-                                        %
-                                      </div>
-                                    </td>
-
-                                    {/* Spend */}
-                                    <td className="px-4 py-4">
-                                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                        {formatCurrency(
-                                          campaign.totals?.spend || 0
-                                        )}
-                                      </div>
-                                    </td>
-
-                                    {/* Conversions */}
-                                    <td className="px-4 py-4">
-                                      <div className="text-xs space-y-1">
-                                        <div className="text-green-600">
-                                          Purchase:{" "}
-                                          {campaign.totals?.actions?.purchase ||
-                                            0}
-                                        </div>
-                                        <div className="text-blue-600">
-                                          Cart:{" "}
-                                          {campaign.totals?.actions
-                                            ?.add_to_cart || 0}
-                                        </div>
-                                        <div className="text-yellow-600">
-                                          Lead:{" "}
-                                          {campaign.totals?.actions?.lead ||
-                                            campaign.totals?.total_leads ||
-                                            0}
-                                        </div>
-                                      </div>
-                                    </td>
-
-                                    {/* Start Date */}
-                                    <td className="px-4 py-4">
-                                      <div className="text-sm text-gray-900 dark:text-white">
-                                        {formatDate(campaign.start_time)}
-                                      </div>
-                                    </td>
-                                  </motion.tr>
-                                )
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-b-lg border border-gray-200 dark:border-gray-700 border-t-0">
-                          <TableCellsIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                            No Campaigns Found
-                          </h3>
-                          <p className="text-gray-600 dark:text-gray-400">
-                            {searchTerm ||
-                            statusFilter !== "all" ||
-                            objectiveFilter !== "all" ||
-                            dateRangeStart ||
-                            dateRangeEnd
-                              ? "No campaigns match your current filters."
-                              : "No campaign data available for this category."}
-                          </p>
+                      {/* Filters Section - Enhanced */}
+                      <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center">
+                            <AdjustmentsHorizontalIcon className="h-4 w-4 mr-2" />
+                            Filters
+                          </h4>
                           {(searchTerm ||
                             statusFilter !== "all" ||
                             objectiveFilter !== "all" ||
@@ -1995,96 +2074,652 @@ const AdvanceAnalyticsPage: React.FC = () => {
                                 setDateRangeStart("");
                                 setDateRangeEnd("");
                               }}
-                              className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
-                              Clear Filters
+                              className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium flex items-center transition-colors group">
+                              <XMarkIcon className="h-3 w-3 mr-1 group-hover:rotate-90 transition-transform" />
+                              Clear all
                             </button>
                           )}
                         </div>
-                      )}
 
-                      {/* 🔥 NEW: Pagination Controls */}
-                      {paginationData.totalPages > 1 && (
-                        <div className="px-6 py-4 border border-gray-200 dark:border-gray-700 border-t-0 bg-gray-50 dark:bg-gray-900/50 rounded-b-lg">
-                          <div className="flex items-center justify-between">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+                          {/* Search - Enhanced */}
+                          <div className="relative lg:col-span-2">
+                            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 transition-colors" />
+                            <input
+                              type="text"
+                              placeholder="Search campaigns..."
+                              value={searchTerm}
+                              onChange={(e) => setSearchTerm(e.target.value)}
+                              className="pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-400 w-full placeholder:text-gray-400 transition-all shadow-sm focus:shadow-md"
+                            />
+                            {searchTerm && (
+                              <button
+                                onClick={() => setSearchTerm("")}
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                                <XMarkIcon className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Status Filter - Enhanced */}
+                          <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-400 transition-all shadow-sm focus:shadow-md appearance-none cursor-pointer hover:border-gray-400 dark:hover:border-gray-500">
+                            <option value="all">📊 All Status</option>
+                            <option value="active">✅ Active</option>
+                            <option value="paused">⏸️ Paused</option>
+                            <option value="archived">📦 Archived</option>
+                          </select>
+
+                          {/* Objective Filter - Enhanced */}
+                          <select
+                            value={objectiveFilter}
+                            onChange={(e) => setObjectiveFilter(e.target.value)}
+                            className="px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-400 transition-all shadow-sm focus:shadow-md appearance-none cursor-pointer hover:border-gray-400 dark:hover:border-gray-500">
+                            <option value="all">🎯 All Objectives</option>
+                            <option value="outcome_leads">🎯 Leads</option>
+                            <option value="outcome_awareness">
+                              📢 Awareness
+                            </option>
+                            <option value="outcome_engagement">
+                              💬 Engagement
+                            </option>
+                            <option value="outcome_sales">💰 Sales</option>
+                          </select>
+
+                          {/* Date Range - Enhanced */}
+                          <div className="relative">
+                            <input
+                              type="date"
+                              value={dateRangeStart}
+                              onChange={(e) =>
+                                setDateRangeStart(e.target.value)
+                              }
+                              className="px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-400 w-full transition-all shadow-sm focus:shadow-md hover:border-gray-400 dark:hover:border-gray-500"
+                              placeholder="Start Date"
+                            />
+                          </div>
+
+                          <div className="relative">
+                            <input
+                              type="date"
+                              value={dateRangeEnd}
+                              onChange={(e) => setDateRangeEnd(e.target.value)}
+                              className="px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-400 w-full transition-all shadow-sm focus:shadow-md hover:border-gray-400 dark:hover:border-gray-500"
+                              placeholder="End Date"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Active Filters Display */}
+                        {(searchTerm ||
+                          statusFilter !== "all" ||
+                          objectiveFilter !== "all" ||
+                          dateRangeStart ||
+                          dateRangeEnd) && (
+                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                Active filters:
+                              </span>
+                              {searchTerm && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-md bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-medium">
+                                  Search: "{searchTerm}"
+                                  <button
+                                    onClick={() => setSearchTerm("")}
+                                    className="ml-1 hover:text-indigo-900 dark:hover:text-indigo-100">
+                                    <XMarkIcon className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              )}
+                              {statusFilter !== "all" && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-md bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-medium">
+                                  Status: {statusFilter}
+                                  <button
+                                    onClick={() => setStatusFilter("all")}
+                                    className="ml-1 hover:text-green-900 dark:hover:text-green-100">
+                                    <XMarkIcon className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              )}
+                              {objectiveFilter !== "all" && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-md bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-medium">
+                                  Objective:{" "}
+                                  {objectiveFilter.replace("outcome_", "")}
+                                  <button
+                                    onClick={() => setObjectiveFilter("all")}
+                                    className="ml-1 hover:text-purple-900 dark:hover:text-purple-100">
+                                    <XMarkIcon className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Enhanced Pagination Info Bar */}
+                      <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 border border-gray-200 dark:border-gray-700 rounded-t-xl px-6 py-4 shadow-sm">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                          {/* Left: Stats */}
+                          <div className="flex items-center space-x-4">
                             <div className="flex items-center space-x-2">
-                              {/* First Page */}
-                              <button
-                                onClick={handleFirstPage}
-                                disabled={currentPage === 1}
-                                className={`p-2 rounded-lg border transition-colors ${
-                                  currentPage === 1
-                                    ? "border-gray-300 text-gray-400 cursor-not-allowed"
-                                    : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                                }`}>
-                                <ChevronDoubleLeftIcon className="h-4 w-4" />
-                              </button>
+                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-lg shadow-green-500/50"></div>
+                              <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                {paginationData.totalItems} Campaigns
+                              </span>
+                            </div>
+                            <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                              Showing{" "}
+                              <span className="font-medium text-gray-900 dark:text-white">
+                                {paginationData.startIndex + 1}-
+                                {paginationData.endIndex}
+                              </span>
+                            </span>
+                          </div>
 
-                              {/* Previous Page */}
-                              <button
-                                onClick={handlePrevPage}
-                                disabled={currentPage === 1}
-                                className={`p-2 rounded-lg border transition-colors ${
-                                  currentPage === 1
-                                    ? "border-gray-300 text-gray-400 cursor-not-allowed"
-                                    : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                                }`}>
-                                <ChevronLeftIcon className="h-4 w-4" />
-                              </button>
+                          {/* Right: Page & Export */}
+                          <div className="flex items-center space-x-3">
+                            {/* Page indicator */}
+                            <div className="flex items-center space-x-2 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+                              <svg
+                                className="w-4 h-4 text-gray-400"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                />
+                              </svg>
+                              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                Page{" "}
+                                <span className="text-indigo-600 dark:text-indigo-400">
+                                  {currentPage}
+                                </span>{" "}
+                                of {paginationData.totalPages}
+                              </span>
                             </div>
 
-                            {/* Page Numbers */}
+                            {/* Export button */}
+                            {/* <motion.button
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => dispatch(openExportModal())}
+                              disabled={
+                                loading || filteredCampaigns.length === 0
+                              }
+                              className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white text-sm font-medium rounded-lg transition-all shadow-md hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60">
+                              <Download className="h-4 w-4" />
+                              <span>Export</span>
+                              <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">
+                                {filteredCampaigns.length}
+                              </span>
+                            </motion.button> */}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Campaign Table - Enhanced */}
+                      {paginationData.currentPageCampaigns.length > 0 ? (
+                        <div className="overflow-x-auto bg-white dark:bg-gray-800 border-x border-b border-gray-200 dark:border-gray-700 shadow-md">
+                          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 sticky top-0 z-10">
+                              <tr>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                  Campaign
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                  Status
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                  Objective
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                  Category
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                  Impressions
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                  Clicks
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                  CTR
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                  Spend
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                  Conversions
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                  Start Date
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                              {paginationData.currentPageCampaigns.map(
+                                (campaign: any, index: number) => (
+                                  <motion.tr
+                                    key={campaign.id}
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{
+                                      delay: index * 0.02,
+                                      duration: 0.3,
+                                    }}
+                                    onClick={() =>
+                                      handleCampaignClick(campaign)
+                                    }
+                                    className="cursor-pointer hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 dark:hover:from-gray-700 dark:hover:to-gray-750 transition-all duration-200 group">
+                                    {/* Campaign Name */}
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center space-x-3">
+                                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs shadow-md">
+                                          {campaign.name
+                                            ?.charAt(0)
+                                            ?.toUpperCase() || "C"}
+                                        </div>
+                                        <div>
+                                          <div className="text-sm font-semibold text-gray-900 dark:text-white max-w-xs truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                            {campaign.name}
+                                          </div>
+                                          <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center space-x-1">
+                                            <svg
+                                              className="w-3 h-3"
+                                              fill="currentColor"
+                                              viewBox="0 0 20 20">
+                                              <path
+                                                fillRule="evenodd"
+                                                d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z"
+                                                clipRule="evenodd"
+                                              />
+                                            </svg>
+                                            <span>{campaign.id}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    {/* Status */}
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center space-x-2">
+                                        {getStatusIcon(campaign.status)}
+                                        <span
+                                          className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
+                                            campaign.status
+                                          )}`}>
+                                          {campaign.status}
+                                        </span>
+                                      </div>
+                                    </td>
+
+                                    {/* Objective */}
+                                    <td className="px-6 py-4">
+                                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                        {campaign.objective?.replace(
+                                          "OUTCOME_",
+                                          ""
+                                        ) || "N/A"}
+                                      </div>
+                                    </td>
+
+                                    {/* Category */}
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <span
+                                        className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm ${(() => {
+                                          const verdict =
+                                            campaign.ai_verdict ||
+                                            campaign.verdict?.category ||
+                                            "Not Analyzed";
+                                          if (verdict.includes("Excellent"))
+                                            return "bg-gradient-to-r from-green-100 to-green-200 text-green-800 dark:from-green-900/30 dark:to-green-800/30 dark:text-green-300";
+                                          if (
+                                            verdict.includes("Good") ||
+                                            verdict.includes("Stable")
+                                          )
+                                            return "bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 dark:from-blue-900/30 dark:to-blue-800/30 dark:text-blue-300";
+                                          if (
+                                            verdict.includes("Average") ||
+                                            verdict.includes("Moderate")
+                                          )
+                                            return "bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 dark:from-yellow-900/30 dark:to-yellow-800/30 dark:text-yellow-300";
+                                          if (
+                                            verdict.includes("Needs") ||
+                                            verdict.includes("Underperforming")
+                                          )
+                                            return "bg-gradient-to-r from-orange-100 to-orange-200 text-orange-800 dark:from-orange-900/30 dark:to-orange-800/30 dark:text-orange-300";
+                                          if (verdict.includes("Poor"))
+                                            return "bg-gradient-to-r from-red-100 to-red-200 text-red-800 dark:from-red-900/30 dark:to-red-800/30 dark:text-red-300";
+                                          return "bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 dark:from-gray-700 dark:to-gray-600 dark:text-gray-300";
+                                        })()}`}>
+                                        {campaign.ai_verdict ||
+                                          campaign.verdict?.category ||
+                                          "Not Analyzed"}
+                                      </span>
+                                    </td>
+
+                                    {/* Impressions */}
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center space-x-2">
+                                        <svg
+                                          className="w-4 h-4 text-gray-400"
+                                          fill="none"
+                                          viewBox="0 0 24 24"
+                                          stroke="currentColor">
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                          />
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                          />
+                                        </svg>
+                                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                          {campaign.totals?.impressions?.toLocaleString() ||
+                                            "0"}
+                                        </span>
+                                      </div>
+                                    </td>
+
+                                    {/* Clicks */}
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center space-x-2">
+                                        <svg
+                                          className="w-4 h-4 text-gray-400"
+                                          fill="none"
+                                          viewBox="0 0 24 24"
+                                          stroke="currentColor">
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
+                                          />
+                                        </svg>
+                                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                          {campaign.totals?.clicks?.toLocaleString() ||
+                                            "0"}
+                                        </span>
+                                      </div>
+                                    </td>
+
+                                    {/* CTR */}
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center space-x-2">
+                                        <div
+                                          className={`w-2 h-2 rounded-full ${
+                                            (campaign.totals?.ctr || 0) > 2
+                                              ? "bg-green-500"
+                                              : (campaign.totals?.ctr || 0) > 1
+                                              ? "bg-yellow-500"
+                                              : "bg-red-500"
+                                          }`}></div>
+                                        <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                                          {(campaign.totals?.ctr || 0).toFixed(
+                                            2
+                                          )}
+                                          %
+                                        </span>
+                                      </div>
+                                    </td>
+
+                                    {/* Spend */}
+                                    <td className="px-6 py-4">
+                                      <div className="text-sm font-bold text-gray-900 dark:text-white">
+                                        {formatCurrency(
+                                          campaign.totals?.spend || 0
+                                        )}
+                                      </div>
+                                    </td>
+
+                                    {/* Conversions */}
+                                    <td className="px-6 py-4">
+                                      <div className="space-y-1">
+                                        <div className="flex items-center space-x-2 text-xs">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                                          <span className="text-green-700 dark:text-green-400 font-medium">
+                                            {campaign.totals?.actions
+                                              ?.purchase || 0}{" "}
+                                            purchases
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center space-x-2 text-xs">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                                          <span className="text-blue-700 dark:text-blue-400 font-medium">
+                                            {campaign.totals?.actions
+                                              ?.add_to_cart || 0}{" "}
+                                            carts
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center space-x-2 text-xs">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
+                                          <span className="text-yellow-700 dark:text-yellow-400 font-medium">
+                                            {campaign.totals?.actions?.lead ||
+                                              campaign.totals?.total_leads ||
+                                              0}{" "}
+                                            leads
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    {/* Start Date */}
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center space-x-2">
+                                        <svg
+                                          className="w-4 h-4 text-gray-400"
+                                          fill="none"
+                                          viewBox="0 0 24 24"
+                                          stroke="currentColor">
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                          />
+                                        </svg>
+                                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                                          {formatDate(campaign.start_time)}
+                                        </span>
+                                      </div>
+                                    </td>
+                                  </motion.tr>
+                                )
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        // Enhanced Empty State
+                        <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 border-x border-b border-gray-200 dark:border-gray-700 rounded-b-xl shadow-md">
+                          <div className="text-center py-16 px-6">
+                            {/* Animated Icon */}
+                            <motion.div
+                              initial={{ scale: 0, rotate: -180 }}
+                              animate={{ scale: 1, rotate: 0 }}
+                              transition={{
+                                type: "spring",
+                                stiffness: 200,
+                                damping: 15,
+                              }}
+                              className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 mb-6 shadow-lg">
+                              <TableCellsIcon className="h-10 w-10 text-indigo-600 dark:text-indigo-400" />
+                            </motion.div>
+
+                            {/* Title */}
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">
+                              No Campaigns Found
+                            </h3>
+
+                            {/* Description */}
+                            <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto leading-relaxed">
+                              {searchTerm ||
+                              statusFilter !== "all" ||
+                              objectiveFilter !== "all" ||
+                              dateRangeStart ||
+                              dateRangeEnd
+                                ? "Your current filters didn't match any campaigns. Try adjusting them to see more results."
+                                : "No campaign data available for this category yet. Start by creating your first campaign."}
+                            </p>
+
+                            {/* Action Button */}
+                            {(searchTerm ||
+                              statusFilter !== "all" ||
+                              objectiveFilter !== "all" ||
+                              dateRangeStart ||
+                              dateRangeEnd) && (
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => {
+                                  setSearchTerm("");
+                                  setStatusFilter("all");
+                                  setObjectiveFilter("all");
+                                  setDateRangeStart("");
+                                  setDateRangeEnd("");
+                                }}
+                                className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all">
+                                <XMarkIcon className="h-5 w-5" />
+                                <span>Clear All Filters</span>
+                              </motion.button>
+                            )}
+
+                            {/* Optional: Suggestions */}
+                            <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                                Suggestions:
+                              </p>
+                              <div className="flex flex-wrap justify-center gap-2">
+                                <span className="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full text-xs text-gray-600 dark:text-gray-400">
+                                  Try different keywords
+                                </span>
+                                <span className="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full text-xs text-gray-600 dark:text-gray-400">
+                                  Remove date filters
+                                </span>
+                                <span className="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full text-xs text-gray-600 dark:text-gray-400">
+                                  Select different category
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Enhanced Pagination Controls */}
+                      {paginationData.totalPages > 1 && (
+                        <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 border-x border-b border-gray-200 dark:border-gray-700 rounded-b-xl px-6 py-4 shadow-md">
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                            {/* Left: First & Previous */}
+                            <div className="flex items-center space-x-2">
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={handleFirstPage}
+                                disabled={currentPage === 1}
+                                className={`p-2.5 rounded-lg border-2 transition-all shadow-sm ${
+                                  currentPage === 1
+                                    ? "border-gray-200 dark:border-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed bg-gray-50 dark:bg-gray-800"
+                                    : "border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md"
+                                }`}>
+                                <ChevronDoubleLeftIcon className="h-4 w-4" />
+                              </motion.button>
+
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={handlePrevPage}
+                                disabled={currentPage === 1}
+                                className={`p-2.5 rounded-lg border-2 transition-all shadow-sm ${
+                                  currentPage === 1
+                                    ? "border-gray-200 dark:border-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed bg-gray-50 dark:bg-gray-800"
+                                    : "border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md"
+                                }`}>
+                                <ChevronLeftIcon className="h-4 w-4" />
+                              </motion.button>
+                            </div>
+
+                            {/* Center: Page Numbers */}
                             <div className="flex items-center space-x-1">
                               {getPageNumbers().map((page, index) => (
                                 <div key={index}>
                                   {page === "..." ? (
-                                    <span className="px-3 py-2 text-gray-500">
-                                      ...
+                                    <span className="px-3 py-2 text-gray-400 dark:text-gray-500 font-medium">
+                                      - - -
                                     </span>
                                   ) : (
-                                    <button
+                                    <motion.button
+                                      whileHover={{ scale: 1.1 }}
+                                      whileTap={{ scale: 0.95 }}
                                       onClick={() =>
                                         handlePageChange(page as number)
                                       }
-                                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                      className={`min-w-[40px] px-3 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm relative overflow-hidden ${
                                         currentPage === page
-                                          ? "bg-indigo-600 text-white"
-                                          : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                                          ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/50 scale-110"
+                                          : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:shadow-md"
                                       }`}>
-                                      {page}
-                                    </button>
+                                      {currentPage === page && (
+                                        <motion.div
+                                          layoutId="active-page"
+                                          className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600"
+                                          transition={{
+                                            type: "spring",
+                                            stiffness: 300,
+                                            damping: 30,
+                                          }}
+                                        />
+                                      )}
+                                      <span className="relative z-10">
+                                        {page}
+                                      </span>
+                                    </motion.button>
                                   )}
                                 </div>
                               ))}
                             </div>
 
+                            {/* Right: Next & Last */}
                             <div className="flex items-center space-x-2">
-                              {/* Next Page */}
-                              <button
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
                                 onClick={handleNextPage}
                                 disabled={
                                   currentPage === paginationData.totalPages
                                 }
-                                className={`p-2 rounded-lg border transition-colors ${
+                                className={`p-2.5 rounded-lg border-2 transition-all shadow-sm ${
                                   currentPage === paginationData.totalPages
-                                    ? "border-gray-300 text-gray-400 cursor-not-allowed"
-                                    : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                                    ? "border-gray-200 dark:border-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed bg-gray-50 dark:bg-gray-800"
+                                    : "border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md"
                                 }`}>
                                 <ChevronRightIcon className="h-4 w-4" />
-                              </button>
+                              </motion.button>
 
-                              {/* Last Page */}
-                              <button
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
                                 onClick={handleLastPage}
                                 disabled={
                                   currentPage === paginationData.totalPages
                                 }
-                                className={`p-2 rounded-lg border transition-colors ${
+                                className={`p-2.5 rounded-lg border-2 transition-all shadow-sm ${
                                   currentPage === paginationData.totalPages
-                                    ? "border-gray-300 text-gray-400 cursor-not-allowed"
-                                    : "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                                    ? "border-gray-200 dark:border-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed bg-gray-50 dark:bg-gray-800"
+                                    : "border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md"
                                 }`}>
                                 <ChevronDoubleRightIcon className="h-4 w-4" />
-                              </button>
+                              </motion.button>
                             </div>
                           </div>
                         </div>
@@ -2114,12 +2749,12 @@ const AdvanceAnalyticsPage: React.FC = () => {
               onClose={handleCloseCampaignDetails}
               campaign={selectedCampaign}
             />
-            <ExportOptionsModal
+            {/* <ExportOptionsModal
               isOpen={exportModal.isOpen}
               onClose={() => dispatch(closeExportModal())}
               onExport={handleExportData}
               campaignCount={filteredCampaigns.length}
-            />
+            /> */}
           </div>
         </div>
       </AnimatePresence>

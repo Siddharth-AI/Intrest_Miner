@@ -151,12 +151,12 @@ const isConnectionTokenValid = async (userUuid, facebookId) => {
       WHERE user_uuid = ? AND fb_user_id = ? AND is_active = 1
     `;
     const results = await selectRecord(query, [userUuid, facebookId]);
-    console.log("🔍 Checking token validity:====>>", results);
+    // console.log("🔍 Checking token validity:====>>", results);
     if (!results || results.length === 0) return false;
 
     const { fb_token_updated_at, fb_token_expires_in } = results[0];
     const tokenAge = (Date.now() - new Date(fb_token_updated_at).getTime()) / 1000;
-    console.log("🔍 Token check=>>>>>>>>>>>>>>>>>:====>>", tokenAge < fb_token_expires_in);
+    // console.log("🔍 Token check=>>>>>>>>>>>>>>>>>:====>>", tokenAge < fb_token_expires_in);
     return tokenAge < fb_token_expires_in;
   } catch (error) {
     throw new Error(`Error checking token validity: ${error.message}`);
@@ -172,7 +172,7 @@ const getPrimaryConnection = async (userUuid) => {
       LIMIT 1
     `;
     const results = await selectRecord(query, [userUuid]);
-    console.log("🔍 Getting primary connection:====>>", results);
+    // console.log("🔍 Getting primary connection:====>>", results);
     return results && results.length > 0 ? results[0] : null;
   } catch (error) {
     throw new Error(`Error getting primary connection: ${error.message}`);

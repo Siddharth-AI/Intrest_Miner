@@ -11,7 +11,7 @@ router.get('/onboarding-status', authenticateToken, async (req, res) => {
 
     const result = await getOnboardingStatus(userId);
 
-    console.log('User ID:=>>>>>>>>>>>>>>>>>>>>>', result);
+    // console.log('User ID:=>>>>>>>>>>>>>>>>>>>>>', result);
     if (!result) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -32,7 +32,7 @@ router.put('/onboarding-status', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.uuid;
 
-    console.log('User ID:=>>>>>>>>>>>>>>>>>>>>>', req.user);
+    // console.log('User ID:=>>>>>>>>>>>>>>>>>>>>>', req.user);
     const { hasSeenOnboarding, hasSeenInterestMinerTutorial } = req.body;
     const updatedBy = req.user.email || req.user.name || 'system';
 

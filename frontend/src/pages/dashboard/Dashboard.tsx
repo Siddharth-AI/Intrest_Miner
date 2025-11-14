@@ -662,7 +662,7 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     if (selectedAccount && campaigns.length > 0) {
-      dispatch(fetchInsights(false));
+      dispatch(fetchInsights({ forceRefresh: false, enableAI: false }));
     }
   }, [selectedAccount, campaigns.length, dispatch]);
 
@@ -672,7 +672,7 @@ const Dashboard: React.FC = () => {
       dispatch(setSelectedAccount(accountId));
       if (accountId && hasFacebookConnection) {
         dispatch(fetchCampaigns(accountId));
-        dispatch(fetchInsights(false));
+        dispatch(fetchInsights({ forceRefresh: false, enableAI: false }));
       }
       toast({
         title: "Loading Data",
@@ -699,7 +699,9 @@ const Dashboard: React.FC = () => {
     try {
       if (selectedAccount) {
         await dispatch(fetchCampaigns(selectedAccount)).unwrap();
-        await dispatch(fetchInsights(false)).unwrap();
+        await dispatch(
+          fetchInsights({ forceRefresh: false, enableAI: false })
+        ).unwrap();
 
         toast({
           title: "Data Refreshed",

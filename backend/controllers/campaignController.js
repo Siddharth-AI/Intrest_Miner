@@ -6,7 +6,7 @@ const { getFacebookToken } = require("../models/facebookModel");
 const fetchCampaigns = async (req, res) => {
   try {
     const userUuid = req.user.uuid; // 🔥 CHANGED: Use UUID instead of user_id
-    console.log("🔄 Fetching campaigns for user:", userUuid);
+    // console.log("🔄 Fetching campaigns for user:", userUuid);
 
     // Get user's Facebook token from database (now uses connections)
     const userFacebookToken = await getFacebookToken(userUuid); // 🔥 CHANGED: Pass UUID
@@ -18,7 +18,7 @@ const fetchCampaigns = async (req, res) => {
       });
     }
 
-    console.log("✅ Found user's Facebook token");
+    // console.log("✅ Found user's Facebook token");
     const data = await getCampaigns(req.params.adAccountId, userFacebookToken);
     res.json(data);
 

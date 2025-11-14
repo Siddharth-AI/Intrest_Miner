@@ -16,11 +16,11 @@ const fetchAdAccounts = async (req, res) => {
       });
     }
 
-    console.log("✅ Found user's Facebook token");
+    // console.log("✅ Found user's Facebook token");
 
     // Use the user's Facebook token to get ad accounts
     const adAccounts = await getAdAccounts(userFacebookToken);
-    console.log(`✅ Retrieved ${adAccounts.length} ad accounts`);
+    // console.log(`✅ Retrieved ${adAccounts.length} ad accounts`);
 
     return res.status(200).json(adAccounts); // Return data directly for compatibility
 

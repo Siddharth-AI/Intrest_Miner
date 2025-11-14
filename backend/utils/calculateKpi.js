@@ -17,7 +17,8 @@ function calculateTotals(insights) {
     cost_per_action_type: {},
     total_leads: 0,
     total_lead_value: 0,
-    average_lead_cost: 0
+    average_lead_cost: 0,
+    revenue: 0    // ← ADD THIS
   };
 
   let leadCostSum = 0;
@@ -29,7 +30,7 @@ function calculateTotals(insights) {
     totals.reach += parseInt(insight.reach || 0);
     totals.spend += parseFloat(insight.spend || 0);
 
-    // Process actions array
+    // Process actions
     if (insight.actions) {
       insight.actions.forEach(action => {
         const type = action.action_type;
@@ -39,23 +40,32 @@ function calculateTotals(insights) {
           totals.actions[type] += value;
         }
 
-        // Track leads specifically
         if (type === 'lead') {
           leadCountSum += value;
 
-          // Find corresponding cost for this insight's leads
           if (insight.cost_per_action_type) {
             const leadCostItem = insight.cost_per_action_type.find(c => c.action_type === 'lead');
             if (leadCostItem) {
               const leadCost = parseFloat(leadCostItem.value || 0);
-              leadCostSum += leadCost * value; // Weighted sum
+              leadCostSum += leadCost * value;
             }
           }
         }
       });
     }
 
-    // Process cost_per_action_type array - SUM VALUES for totals
+    // Revenue from action_values
+    const actionValues = insight.action_values || [];
+
+    const purchaseValue = actionValues.find(v =>
+      v.action_type === "purchase" ||
+      v.action_type === "omni_purchase" ||
+      v.action_type === "onsite_web_purchase"
+    );
+
+    totals.revenue += parseFloat(purchaseValue?.value || 0);
+
+    // Cost per action types
     if (insight.cost_per_action_type) {
       insight.cost_per_action_type.forEach(costAction => {
         const actionType = costAction.action_type;
@@ -70,24 +80,24 @@ function calculateTotals(insights) {
     }
   });
 
-  // Calculate derived metrics
+  // Derived metrics
   totals.ctr = totals.clicks && totals.impressions
     ? (totals.clicks / totals.impressions) * 100
     : 0;
+
   totals.cpc = totals.clicks ? totals.spend / totals.clicks : 0;
   totals.cpp = totals.actions.purchase ? totals.spend / totals.actions.purchase : 0;
 
-  // Set total_leads = actions.lead (NO DOUBLE COUNTING)
   totals.total_leads = totals.actions.lead;
 
-  // Calculate lead-specific metrics
   if (leadCountSum > 0) {
-    totals.average_lead_cost = leadCostSum / leadCountSum; // Weighted average
-    totals.total_lead_value = totals.spend; // Total spend
+    totals.average_lead_cost = leadCostSum / leadCountSum;
+    totals.total_lead_value = totals.spend;
   }
 
   return totals;
 }
+
 
 function recommendCampaign(campaignAnalysis) {
   return campaignAnalysis
@@ -165,4 +175,26 @@ function getPerformanceCategory(campaign, totals) {
   return 'underperforming';
 }
 
-module.exports = { calculateTotals, recommendCampaign, getPerformanceCategory };
+function calculateOpenAICost(usage) {
+  if (!usage) return { usd: 0, inr: 0 };
+
+  const prompt_tokens = usage.prompt_tokens || 0;
+  const completion_tokens = usage.completion_tokens || 0;
+
+  const costInputUSD = (prompt_tokens / 1_000_000) * 5;   // $5 per 1M tokens
+  const costOutputUSD = (completion_tokens / 1_000_000) * 15; // $15 per 1M tokens
+
+  const totalUSD = costInputUSD + costOutputUSD;
+  const INR_RATE = 84;
+
+  return {
+    usd: totalUSD,
+    inr: totalUSD * INR_RATE,
+    prompt_tokens,
+    completion_tokens,
+    total_tokens: prompt_tokens + completion_tokens
+  };
+}
+
+
+module.exports = { calculateOpenAICost, calculateTotals, recommendCampaign, getPerformanceCategory };

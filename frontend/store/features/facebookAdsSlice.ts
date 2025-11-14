@@ -62,6 +62,11 @@ export interface Campaign {
   source_campaign_id: string;
   totals?: any;
   verdict?: any;
+  // 🔥 NEW: AI Analysis Fields
+  ai_verdict?: string;
+  ai_analysis?: string;
+  ai_recommendations?: string;
+
 }
 
 export interface InsightData {
@@ -333,17 +338,34 @@ const separateCampaignsByCategory = (campaigns: Campaign[]) => {
   };
 };
 
-// 🔥 NEW: FIXED Cache management helpers
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+// 🔥 CHANGED: 12-hour cache instead of 5 minutes
+const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours cache
+
 
 const generateCacheKey = (accountId: string, dateFilter: string, customDateRange: any) => {
   return `${accountId}_${dateFilter}_${customDateRange.since || 'none'}_${customDateRange.until || 'none'}`;
 };
 
+// 🔥 UPDATED: Better cache validation with logging
 const isCacheValid = (cacheEntry: any) => {
-  if (!cacheEntry) return false;
-  return Date.now() - cacheEntry.timestamp < cacheEntry.expiresIn;
+  if (!cacheEntry) {
+    console.log('❌ No cache found');
+    return false;
+  }
+
+  const ageMs = Date.now() - cacheEntry.timestamp;
+  const ageHours = (ageMs / (60 * 60 * 1000)).toFixed(1);
+  const isValid = ageMs < cacheEntry.expiresIn;
+
+  if (isValid) {
+    console.log(`✅ Cache is valid (${ageHours} hours old)`);
+  } else {
+    console.log(`⏰ Cache expired (${ageHours} hours old, limit is 12h)`);
+  }
+
+  return isValid;
 };
+
 
 // ===== Enhanced Initial State =====
 const initialState: FacebookAdsState = {
@@ -540,7 +562,14 @@ export const fetchCampaigns = createAsyncThunk("facebookAds/fetchCampaigns", asy
 // 🔥 FIXED: fetchInsights thunk with proper caching and state management
 export const fetchInsights = createAsyncThunk(
   "facebookAds/fetchInsights",
-  async (forceRefresh: boolean = false, { getState, rejectWithValue }) => {
+  async (
+    params: {
+      forceRefresh?: boolean;
+      enableAI?: boolean; // 🔥 NEW: Control AI
+    } = {},
+    { getState, rejectWithValue }
+  ) => {
+    const { forceRefresh = false, enableAI = false } = params;
     const state = getState() as { facebookAds: FacebookAdsState };
     const { selectedAccount, dateFilter, customDateRange, insightsCache } = state.facebookAds;
 
@@ -548,13 +577,17 @@ export const fetchInsights = createAsyncThunk(
       return rejectWithValue("No account selected");
     }
 
-    const cacheKey = generateCacheKey(selectedAccount, dateFilter, customDateRange);
+    // 🔥 Include AI flag in cache key - separate cache for AI/non-AI
+    const cacheKey = `${selectedAccount}_${dateFilter}_${customDateRange.since || 'none'}_${customDateRange.until || 'none'}_AI${enableAI ? '_ON' : '_OFF'}`;
+
 
     // 🔥 Check cache first, but allow force refresh
     if (!forceRefresh) {
       const cachedData = insightsCache[cacheKey];
       if (isCacheValid(cachedData)) {
-        console.log(`✅ Using cached insights for ${selectedAccount}`);
+        const ageHours = ((Date.now() - cachedData.timestamp) / (60 * 60 * 1000)).toFixed(1);
+        console.log(`✅ Using cached insights for ${selectedAccount} (${ageHours} hours old)`);
+        console.log(`📊 Cached campaigns: ${cachedData.data.campaignAnalysis?.length || 0}`);
         // Return cached data with special flag to update UI properly
         return {
           ...cachedData.data,
@@ -563,17 +596,27 @@ export const fetchInsights = createAsyncThunk(
           timestamp: cachedData.timestamp
         };
       }
+
+      // If cache expired or doesn't exist
+      if (cachedData) {
+        const ageHours = ((Date.now() - cachedData.timestamp) / (60 * 60 * 1000)).toFixed(1);
+        console.log(`⏰ Cache expired (${ageHours} hours old), fetching fresh data...`);
+      } else {
+        console.log(`🔄 No cache found, fetching fresh data...`);
+      }
     }
 
     const token = getAccessToken();
     if (!token) return rejectWithValue("No access token found");
-
+    if (forceRefresh) {
+      console.log('🔄 Force refresh requested, bypassing cache...');
+    }
     try {
-      console.log(`🔄 Fetching fresh insights for ${selectedAccount}`);
-
+      console.log(`🔄 Fetching insights for ${selectedAccount} | AI: ${enableAI ? 'ENABLED 💸' : 'DISABLED (FREE)'}`);
       const body: any = {
         mode: "analyze",
-        adAccountId: selectedAccount
+        adAccountId: selectedAccount,
+        enableAI: enableAI  // 🔥 Send AI flag to backend
       };
 
       if (dateFilter === "custom") {
@@ -602,12 +645,47 @@ let debounceTimer: NodeJS.Timeout;
 
 export const fetchInsightsDebounced = createAsyncThunk(
   "facebookAds/fetchInsightsDebounced",
-  async (_, { dispatch }) => {
-    clearTimeout(debounceTimer);
-    return new Promise((resolve) => {
+  async (
+    params: {
+      forceRefresh?: boolean;
+      enableAI?: boolean;  // 🔥 NEW
+    } = {},
+    { dispatch }
+  ) => {
+    const { forceRefresh = false, enableAI = false } = params;
+
+    // Clear existing timer
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+
+    // 🔥 FIX: Return a proper promise
+    return new Promise((resolve, reject) => {
       debounceTimer = setTimeout(async () => {
-        const result = await dispatch(fetchInsights(false));
-        resolve(result.payload);
+        try {
+          console.log(`⏱️ Debounced fetch | AI: ${enableAI ? 'ENABLED 💸' : 'DISABLED (FREE)'}`);
+
+          // Dispatch fetchInsights
+          const result = await dispatch(fetchInsights({
+            forceRefresh,
+            enableAI
+          }));
+
+          // 🔥 CRITICAL: Check if successful
+          if (fetchInsights.fulfilled.match(result)) {
+            console.log('✅ Insights fetch successful');
+            resolve(result.payload);
+          } else if (fetchInsights.rejected.match(result)) {
+            console.error('❌ Insights fetch rejected:', result.payload);
+            reject(result.payload);
+          } else {
+            console.warn('⚠️ Unexpected result:', result);
+            // resolve(result.payload)
+          }
+        } catch (error) {
+          console.error('❌ Debounced fetch error:', error);
+          reject(error);
+        }
       }, 1000);
     });
   }
@@ -772,6 +850,24 @@ const facebookAdsSlice = createSlice({
         }
       });
     },
+    // 🔥 NEW: Clear cache for specific account or all
+    clearCache: (state, action: PayloadAction<string | 'all'>) => {
+      if (action.payload === 'all') {
+        console.log('🗑️ Clearing all account caches');
+        state.insightsCache = {};
+        state.insightsLastUpdated = {};
+      } else {
+        console.log(`🗑️ Clearing cache for account: ${action.payload}`);
+        // Clear all cache keys starting with this account ID
+        Object.keys(state.insightsCache).forEach(key => {
+          if (key.startsWith(action.payload)) {
+            delete state.insightsCache[key];
+          }
+        });
+        delete state.insightsLastUpdated[action.payload];
+      }
+    },
+
     // 🔥 NEW: Facebook authentication reducers
     clearFacebookAuth: (state) => {
       state.facebookAuth = {
@@ -885,8 +981,9 @@ const facebookAdsSlice = createSlice({
 
           state.insightsCache[data.cacheKey] = cacheEntry;
           state.insightsLastUpdated[state.selectedAccount] = Date.now();
-
           console.log(`💾 Fresh data cached: ${data.cacheKey}`);
+          console.log(`📊 Cached ${state.campaignAnalysis.length} campaigns`);
+          console.log(`⏰ Cache will expire in 12 hours`);
         } else {
           console.log(`📦 Using cached data: ${data.cacheKey}`);
         }
@@ -1000,12 +1097,13 @@ export const {
   clearFacebookAuth,
   setFacebookError,
   resetFilters,
-
+  clearCache, // 🔥 NEW
   // 🔥 NEW: Cache management exports
   invalidateInsightsCache,
   openExportModal,
   closeExportModal,
   setExportOptions,
+
 } = facebookAdsSlice.actions;
 
 export default facebookAdsSlice.reducer;

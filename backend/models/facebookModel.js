@@ -23,7 +23,7 @@ const {
 
 const getFacebookToken = async (userUuid) => {
   try {
-    console.log("🔍 Getting Facebook token for user:", userUuid);
+    // console.log("🔍 Getting Facebook token for user:", userUuid);
 
     // Get user's primary connection or first active connection
     const primaryConnection = await getPrimaryConnection(userUuid);
@@ -33,7 +33,7 @@ const getFacebookToken = async (userUuid) => {
       const isValid = await isConnectionTokenValid(userUuid, primaryConnection.fb_user_id);
 
       if (isValid) {
-        console.log("✅ Found valid primary Facebook token");
+        // console.log("✅ Found valid primary Facebook token");
         return primaryConnection.fb_access_token;
       } else {
         console.log("⚠️ Primary token expired");
@@ -216,7 +216,7 @@ const getUserFacebookStatus = async (userUuid) => {
       WHERE uuid = ? AND is_deleted = 0
     `;
     const results = await selectRecord(query, [userUuid]);
-    console.log("🔍 Getting user Facebook status:====>>", results);
+    // console.log("🔍 Getting user Facebook status:====>>", results);
 
     if (!results || results.length === 0) return null;
 

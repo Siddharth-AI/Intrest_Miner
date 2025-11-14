@@ -50,17 +50,24 @@ import ExportOptionsModal, {
 import {
   openExportModal,
   closeExportModal,
-} from "../../../store/features/facebookAdsSlice";
-
-import {
   fetchAdAccounts,
   setSelectedAccount,
   fetchCampaigns,
   fetchInsights,
-  fetchInsightsDebounced,
   checkFacebookStatus,
+  setDateFilter,
+  setCustomDateRange,
+  setSearchTerm,
+  setStatusFilter,
+  setShowModal,
+  setShowCustomDatePicker,
+  setSelectedCampaignForModal,
+  clearError,
+  clearCache,
+  fetchInsightsDebounced,
 } from "../../../store/features/facebookAdsSlice";
 import { useToast } from "@/hooks/use-toast";
+import { Download, RefreshCw } from "lucide-react";
 
 const AdvanceAnalyticsPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -87,9 +94,13 @@ const AdvanceAnalyticsPage: React.FC = () => {
   );
 
   // Add these selectors
-  const { adAccounts, selectedAccount } = useAppSelector(
-    (state) => state.facebookAds
-  );
+  const {
+    adAccounts,
+    selectedAccount,
+    dateFilter, // 🔥 ADD THIS
+    customDateRange, // 🔥 ADD THIS
+    insightsCache,
+  } = useAppSelector((state) => state.facebookAds);
 
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [showHelpTooltip, setShowHelpTooltip] = useState(true);
@@ -164,38 +175,149 @@ const AdvanceAnalyticsPage: React.FC = () => {
     }
   }, [adAccounts, selectedAccount, dispatch, toast]);
 
+  // Only run when component is mounted (page is active)
   useEffect(() => {
     if (selectedAccount) {
       console.log(`🔄 Account selected: ${selectedAccount}`);
-      // Always fetch campaigns (lightweight)
       dispatch(fetchCampaigns(selectedAccount));
-      // Always fetch insights - let Redux handle caching
-      dispatch(fetchInsights(false)); // false means no force refresh
+      // 🔥 Reset insights requested when account changes
+      setInsightsRequested(false);
     }
   }, [selectedAccount, dispatch]);
 
-  // Smart insights loading
   const shouldLoadInsights = useMemo(() => {
-    if (!selectedAccount) return false;
-
-    const lastUpdated = insightsLastUpdated[selectedAccount];
-    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-
-    return !lastUpdated || lastUpdated < fiveMinutesAgo;
-  }, [selectedAccount, insightsLastUpdated]);
-
-  // Load campaigns immediately, insights smartly
+    return selectedAccount !== null; // ✅ Simple and works!
+  }, [selectedAccount]);
+  // 🔥 Reset insights requested when component mounts
   useEffect(() => {
-    if (selectedAccount) {
-      // Always fetch campaigns (lightweight)
-      dispatch(fetchCampaigns(selectedAccount));
+    console.log(
+      "📍 AdvanceAnalytics component mounted, resetting insights state"
+    );
+    setInsightsRequested(false);
+  }, []); // Run only once on mount
 
-      // Only fetch insights if needed and not already requested
-      if (shouldLoadInsights && !insightsRequested && !loadingTotals) {
-        console.log(`🔄 Loading insights for account: ${selectedAccount}`);
-        dispatch(fetchInsightsDebounced());
-        setInsightsRequested(true);
+  // useEffect(() => {
+  //   console.log("🔍 Checking insights conditions:", {
+  //     selectedAccount: !!selectedAccount,
+  //     shouldLoadInsights,
+  //     insightsRequested,
+  //     loadingTotals,
+  //   });
+
+  //   if (
+  //     selectedAccount &&
+  //     shouldLoadInsights &&
+  //     !insightsRequested &&
+  //     !loadingTotals
+  //   ) {
+  //     console.log("🔄 AdvanceAnalytics: Loading insights for", selectedAccount);
+
+  //     // 🔥 Generate AI cache key to check if AI data exists
+  //     const aiCacheKey = `${selectedAccount}_${dateFilter}_${
+  //       customDateRange.since || "none"
+  //     }_${customDateRange.until || "none"}_AI_ON`;
+  //     const hasAICache = insightsCache && insightsCache[aiCacheKey];
+
+  //     if (!hasAICache) {
+  //       console.log("⚠️ No AI cache found, forcing AI analysis...");
+  //       // Force refresh with AI if no AI cache exists
+  //       dispatch(
+  //         fetchInsightsDebounced({
+  //           forceRefresh: true, // 🔥 Force to run AI
+  //           enableAI: true,
+  //         })
+  //       );
+  //     } else {
+  //       console.log("✅ AI cache exists, using it...");
+  //       // Use existing AI cache
+  //       dispatch(
+  //         fetchInsightsDebounced({
+  //           forceRefresh: false,
+  //           enableAI: true,
+  //         })
+  //       );
+  //     }
+
+  //     setInsightsRequested(true);
+  //   }
+  // }, [
+  //   selectedAccount,
+  //   shouldLoadInsights,
+  //   insightsRequested,
+  //   loadingTotals,
+  //   dispatch,
+  //   dateFilter,
+  //   customDateRange,
+  //   insightsCache,
+  // ]);
+
+  // 🔥 SIMPLIFIED: Use existing Redux loadingTotals state
+  useEffect(() => {
+    if (
+      selectedAccount &&
+      shouldLoadInsights &&
+      !insightsRequested &&
+      !loadingTotals
+    ) {
+      console.log("🔄 AdvanceAnalytics: Loading insights for", selectedAccount);
+
+      // Generate AI cache key
+      const aiCacheKey = `${selectedAccount}_${dateFilter}_${
+        customDateRange.since || "none"
+      }_${customDateRange.until || "none"}_AI_ON`;
+      const hasAICache = insightsCache && insightsCache[aiCacheKey];
+
+      console.log(
+        "🔍 AI Cache check:",
+        hasAICache ? "✅ FOUND" : "❌ NOT FOUND"
+      );
+
+      if (!hasAICache) {
+        console.log("⚠️ No AI cache, running AI analysis...");
+
+        // 🔥 Show toast for long-running AI
+        toast({
+          title: "🤖 AI Analysis Started",
+          description:
+            "This may take 30-60 seconds. Feel free to navigate away.",
+          duration: 5000,
+        });
+
+        // Force AI run
+        dispatch(
+          fetchInsightsDebounced({
+            forceRefresh: true,
+            enableAI: true,
+          })
+        )
+          .unwrap()
+          .then(() => {
+            console.log("✅ AI analysis completed!");
+            toast({
+              title: "✅ AI Analysis Complete",
+              description: "Your campaign insights are ready!",
+            });
+          })
+          .catch((error: any) => {
+            console.error("❌ AI analysis failed:", error);
+            toast({
+              title: "❌ Analysis Failed",
+              description: error?.message || "Please try again",
+              variant: "destructive",
+            });
+          });
+      } else {
+        console.log("✅ Using existing AI cache...");
+        // Use existing cache
+        dispatch(
+          fetchInsightsDebounced({
+            forceRefresh: false,
+            enableAI: true,
+          })
+        );
       }
+
+      setInsightsRequested(true);
     }
   }, [
     selectedAccount,
@@ -203,7 +325,25 @@ const AdvanceAnalyticsPage: React.FC = () => {
     insightsRequested,
     loadingTotals,
     dispatch,
+    dateFilter,
+    customDateRange,
+    insightsCache,
+    toast,
   ]);
+
+  // 🔥 Reset when leaving page
+  useEffect(() => {
+    return () => {
+      console.log("📍 Leaving AdvanceAnalytics - resetting insights state");
+      setInsightsRequested(false);
+    };
+  }, []);
+
+  // 🔥 Reset when account changes
+  useEffect(() => {
+    setInsightsRequested(false);
+  }, [selectedAccount]);
+
   // Add this function after your existing functions (around line 150-200)
   const handleAccountChange = useCallback(
     (accountId: string) => {
@@ -224,7 +364,12 @@ const AdvanceAnalyticsPage: React.FC = () => {
 
           // Only fetch insights if needed
           if (shouldLoadInsights) {
-            dispatch(fetchInsightsDebounced());
+            dispatch(
+              fetchInsightsDebounced({
+                forceRefresh: false,
+                enableAI: true, // 🔥 YES AI for analytics page
+              })
+            );
             setInsightsRequested(true);
           }
         }
@@ -436,6 +581,68 @@ const AdvanceAnalyticsPage: React.FC = () => {
     return pages;
   };
 
+  // 🔥 NEW: Force refresh handler - bypasses cache
+  const handleForceRefresh = () => {
+    if (!selectedAccount) {
+      toast({
+        title: "No Account Selected",
+        description: "Please select an ad account first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log("🔄 User triggered force refresh");
+
+    // Dispatch with forceRefresh flag
+    dispatch(
+      fetchInsightsDebounced({
+        forceRefresh: true,
+        enableAI: true,
+      })
+    );
+
+    toast({
+      title: "Refreshing Data",
+      description:
+        "Fetching fresh insights from Meta and running AI analysis...",
+    });
+  };
+
+  // 🔥 NEW: Clear all cache handler
+  const handleClearAllCache = () => {
+    dispatch(clearCache("all"));
+
+    toast({
+      title: "Cache Cleared",
+      description:
+        "All cached insights have been cleared. Fresh data will be fetched on next load.",
+    });
+
+    console.log("🗑️ User cleared all cache");
+  };
+
+  // 🔥 NEW: Clear current account cache
+  const handleClearAccountCache = () => {
+    if (!selectedAccount) {
+      toast({
+        title: "No Account Selected",
+        description: "Please select an ad account first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    dispatch(clearCache(selectedAccount));
+
+    toast({
+      title: "Account Cache Cleared",
+      description: `Cache cleared for current account. Fresh data will be fetched on next load.`,
+    });
+
+    console.log(`🗑️ User cleared cache for account: ${selectedAccount}`);
+  };
+
   // Overall stats cards with your existing animation
   const statsCards = useMemo(() => {
     if (!overallTotals) return [];
@@ -609,141 +816,280 @@ const AdvanceAnalyticsPage: React.FC = () => {
     setSelectedCampaign(null);
   };
 
+  const getFilteredCampaigns = () => {
+    return filteredCampaigns;
+  };
+
   const handleExportData = async (options: ExportOptions) => {
     try {
+      setIsExporting(true);
+      console.log("🚀 ========== EXPORT STARTED ==========");
+      console.log("📋 Export options:", options);
+
       if (!selectedAccount) {
+        console.error("❌ No ad account selected");
         toast({
-          title: "No Account Selected",
-          description: "Please select an ad account first",
+          title: "Error",
+          description: "Please select an ad account first.",
           variant: "destructive",
         });
         return;
       }
+
+      const filteredCampaigns = getFilteredCampaigns();
+      console.log(`📊 Filtered campaigns count: ${filteredCampaigns.length}`);
+      console.log(
+        "📊 Campaign Analysis available:",
+        campaignAnalysis?.length || 0
+      );
 
       if (filteredCampaigns.length === 0) {
+        console.error("❌ No campaigns to export");
         toast({
-          title: "No Data to Export",
-          description: "No campaigns match your current filters",
+          title: "Error",
+          description: "No campaigns available to export.",
           variant: "destructive",
         });
         return;
       }
 
-      setIsExporting(true);
+      console.log("🔄 Starting campaign data mapping...");
 
-      const token = localStorage.getItem("token");
-      if (!token) {
-        toast({
-          title: "Authentication Required",
-          description: "Please login to export data",
-          variant: "destructive",
-        });
-        setIsExporting(false);
-        return;
-      }
+      // 🔥 Map campaigns with full data from Redux
+      const campaignsToExport = filteredCampaigns.map(
+        (campaign: any, index: number) => {
+          console.log(
+            `\n--- Campaign ${index + 1}/${filteredCampaigns.length}: ${
+              campaign.name
+            } ---`
+          );
 
-      const selectedAccountData = adAccounts.find(
-        (acc) => acc.id === selectedAccount
+          // Find matching campaign WITH insights and AI/verdict data
+          const fullCampaignData = campaignAnalysis?.find(
+            (c: any) => c.id === campaign.id
+          );
+
+          if (!fullCampaignData) {
+            console.warn(`⚠️ No full data for campaign: ${campaign.name}`);
+            return {
+              id: campaign.id,
+              name: campaign.name,
+              status: campaign.status,
+              objective: campaign.objective,
+              start_time: campaign.start_time,
+              stop_time: campaign.stop_time,
+            };
+          }
+
+          // Check data availability - STRICT checks!
+          const hasAIVerdict =
+            fullCampaignData.ai_verdict !== undefined &&
+            fullCampaignData.ai_verdict !== null &&
+            fullCampaignData.ai_verdict !== "";
+
+          const hasRuleVerdict =
+            fullCampaignData.verdict !== undefined &&
+            fullCampaignData.verdict !== null;
+
+          const hasMetrics = !!fullCampaignData.totals;
+
+          console.log("  ✅ Full data found!");
+          console.log("  📊 Has Metrics:", hasMetrics);
+          console.log("  🤖 Has AI Verdict:", hasAIVerdict);
+          console.log("  📋 Has Rule Verdict:", hasRuleVerdict);
+
+          // Log actual values for debugging
+          if (hasAIVerdict) {
+            console.log("  🤖 AI Verdict value:", fullCampaignData.ai_verdict);
+          }
+
+          if (hasRuleVerdict) {
+            console.log("  📋 Rule Verdict value:", fullCampaignData.verdict);
+          }
+
+          // Build export object
+          const campaignData = fullCampaignData as any;
+          const exportData: any = {
+            id: campaignData.id,
+            name: campaignData.name,
+            status: campaignData.status,
+            objective: campaignData.objective,
+            start_time: campaignData.start_time,
+            stop_time: campaignData.stop_time,
+            daily_budget: campaignData.daily_budget,
+            lifetime_budget: campaignData.lifetime_budget,
+
+            // Include ALL totals/metrics
+            totals: campaignData.totals,
+
+            // Include KPI fields from totals if available
+            totalSpend: campaignData.totals?.spend || 0,
+            totalImpressions: campaignData.totals?.impressions || 0,
+            totalClicks: campaignData.totals?.clicks || 0,
+            totalReach: campaignData.totals?.reach || 0,
+            avgCTR: campaignData.totals?.ctr || 0,
+            avgCPM: campaignData.totals?.cpm || 0,
+            avgCPC: campaignData.totals?.cpc || 0,
+            totalPurchases: campaignData.totals?.actions?.purchase || 0,
+            totalAddToCart: campaignData.totals?.actions?.add_to_cart || 0,
+            totalConversions: campaignData.totals?.total_conversions || 0,
+          };
+
+          // 🔥 Add AI verdict if truly available
+          if (hasAIVerdict) {
+            console.log("  ✅ Adding AI verdict to export");
+            exportData.aiverdict = campaignData.ai_verdict;
+            exportData.aianalysis =
+              campaignData.ai_analysis || "No analysis available";
+            exportData.airecommendations =
+              campaignData.ai_recommendations ||
+              "No recommendations available";
+            console.log("  📤 AI Verdict exported:", exportData.aiverdict);
+          }
+          // 🔥 FALLBACK: Use rule-based verdict
+          else if (hasRuleVerdict) {
+            console.log("  ✅ Using rule verdict as AI verdict for export");
+
+            const verdictCategory =
+              campaignData.verdict?.category || "unknown";
+            const verdictDescription =
+              campaignData.verdict?.description ||
+              "Performance level: unknown";
+
+            exportData.aiverdict = verdictDescription;
+            exportData.aianalysis = `Rule-based analysis: This campaign is classified as "${verdictCategory}". ${verdictDescription}. Based on current metrics, this campaign requires attention.`;
+            exportData.airecommendations = `Review campaign ${
+              verdictCategory === "underperforming" ? "urgently" : "regularly"
+            } and consider optimization strategies such as adjusting targeting, creative, or budget allocation.`;
+
+            console.log("  📤 Rule Verdict exported:", exportData.aiverdict);
+          } else {
+            console.warn("  ⚠️ NO VERDICT DATA AVAILABLE!");
+            console.warn(
+              "  🔍 Available keys:",
+              Object.keys(campaignData).join(", ")
+            );
+
+            // Fallback for no verdict
+            exportData.aiverdict = "No verdict available";
+            exportData.aianalysis = "Insufficient data for analysis";
+            exportData.airecommendations =
+              "Ensure campaign has sufficient data and is properly configured";
+          }
+
+          // Include verdict object for backend reference
+          if (hasRuleVerdict) {
+            exportData.verdict = campaignData.verdict;
+          }
+
+          return exportData;
+        }
       );
-      const accountName =
-        selectedAccountData?.name || selectedAccount.replace("act_", "");
 
-      const campaignsToExport = filteredCampaigns.map((campaign) => ({
-        id: campaign.id,
-        name: campaign.name,
-        status: campaign.status,
-        objective: campaign.objective,
-        start_time: campaign.start_time,
-      }));
+      // Summary logs
+      const campaignsWithMetrics = campaignsToExport.filter((c) => c.totals);
+      const campaignsWithVerdict = campaignsToExport.filter(
+        (c) => c.aiverdict && c.aiverdict !== "No verdict available"
+      );
 
-      console.log("Exporting with options:", options);
+      console.log("\n📊 ========== EXPORT SUMMARY ==========");
+      console.log(`  Total campaigns: ${campaignsToExport.length}`);
+      console.log(`  With metrics: ${campaignsWithMetrics.length}`);
+      console.log(`  With verdict: ${campaignsWithVerdict.length}`);
+      console.log("======================================\n");
 
-      // Show appropriate toast based on options
-      let toastMessage = "";
-      if (options.includeCampaignDetails && options.includeAIAnalysis) {
-        toastMessage = `Analyzing ${campaignsToExport.length} campaigns with AI... This may take a moment.`;
-      } else if (options.includeAIAnalysis) {
-        toastMessage = `Generating AI analysis for ${campaignsToExport.length} campaigns...`;
-      } else {
-        toastMessage = `Preparing campaign data for ${campaignsToExport.length} campaigns...`;
-      }
+      // Build payload
+      const exportPayload = {
+        campaigns: campaignsToExport,
+        adAccountId: selectedAccount,
+        adAccountName:
+          adAccounts.find((acc) => acc.id === selectedAccount)?.name ||
+          selectedAccount,
+        date_start: dateRangeStart || undefined,
+        date_stop: dateRangeEnd || undefined,
+        exportOptions: options,
+      };
 
-      toast({
-        title: "Preparing Export",
-        description: toastMessage,
-      });
+      console.log("📤 Sending export request to backend...");
+      console.log("  Account:", exportPayload.adAccountName);
+      console.log("  Campaigns:", exportPayload.campaigns.length);
+      console.log("  Options:", exportPayload.exportOptions);
 
       const response = await fetch(
-        `${import.meta.env.VITE_INTEREST_MINER_API_URL}/api/export/campaigns`,
+        `${
+          import.meta.env.VITE_INTEREST_MINER_API_URL
+        }/api/export-filtered-campaigns`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-          body: JSON.stringify({
-            adAccountId: selectedAccount,
-            adAccountName: accountName,
-            campaigns: campaignsToExport,
-            date_start: dateRangeStart || undefined,
-            date_stop: dateRangeEnd || undefined,
-            // 🔥 SEND EXPORT OPTIONS
-            exportOptions: {
-              includeCampaignDetails: options.includeCampaignDetails,
-              includeAIAnalysis: options.includeAIAnalysis,
-            },
-          }),
+          body: JSON.stringify(exportPayload),
         }
       );
 
+      console.log("📥 Response status:", response.status);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Export failed");
-      }
+        let errorMessage = "Export failed";
+        const contentType = response.headers.get("content-type");
 
-      // Extract filename
-      let filename = `Campaign_Report_${
-        new Date().toISOString().split("T")[0]
-      }.xlsx`;
-      const contentDisposition = response.headers.get("Content-Disposition");
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(
-          /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/
-        );
-        if (filenameMatch) {
-          filename = filenameMatch[1].replace(/['"]/g, "");
+        if (contentType && contentType.includes("application/json")) {
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+            console.error("❌ Backend error (JSON):", errorData);
+          } catch (e) {
+            console.error("Failed to parse error response:", e);
+          }
+        } else {
+          const text = await response.text();
+          console.error("❌ Backend error (HTML):", text.substring(0, 500));
+          errorMessage = `Server error (${response.status})`;
         }
+
+        throw new Error(errorMessage);
       }
 
-      // Download
+      // Download the file
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
+      const a = document.createElement("a");
+      a.style.display = "none";
+      a.href = url;
 
-      setTimeout(() => {
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      }, 100);
+      const contentDisposition = response.headers.get("Content-Disposition");
+      const filename = contentDisposition
+        ? contentDisposition.split("filename=")[1]?.replace(/"/g, "")
+        : `MetaAdsExport_${new Date().toISOString().split("T")[0]}.xlsx`;
+
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      console.log("✅ Export successful! File:", filename);
+      console.log("🚀 ========== EXPORT COMPLETE ==========\n");
 
       toast({
-        title: "Export Successful!",
-        description: `Downloaded: ${filename}`,
+        title: "Success",
+        description: `Successfully exported ${filteredCampaigns.length} campaigns!`,
       });
+    } catch (error: any) {
+      console.error("❌ ========== EXPORT FAILED ==========");
+      console.error("Error:", error);
+      console.error("Stack:", error.stack);
 
-      setIsExporting(false);
-    } catch (error) {
-      console.error("Export error:", error);
       toast({
         title: "Export Failed",
-        description:
-          error instanceof Error ? error.message : "Failed to export data",
+        description: error.message || "An unexpected error occurred",
         variant: "destructive",
       });
+    } finally {
       setIsExporting(false);
+      dispatch(closeExportModal());
     }
   };
 
@@ -1392,80 +1738,45 @@ const AdvanceAnalyticsPage: React.FC = () => {
                           placeholder="End Date"
                         />
 
-                        {/* 🆕 EXPORT BUTTON */}
-                        <button
-                          onClick={() => dispatch(openExportModal())}
-                          disabled={
-                            !selectedAccount ||
-                            filteredCampaigns.length === 0 ||
-                            isExporting
-                          }
-                          className={`
-      flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200
-      ${
-        !selectedAccount || filteredCampaigns.length === 0 || isExporting
-          ? "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-          : "bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-      }
-    `}>
-                          {isExporting ? (
-                            <>
-                              <svg
-                                className="animate-spin h-4 w-4"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24">
-                                <circle
-                                  className="opacity-25"
-                                  cx="12"
-                                  cy="12"
-                                  r="10"
-                                  stroke="currentColor"
-                                  strokeWidth="4"></circle>
-                                <path
-                                  className="opacity-75"
-                                  fill="currentColor"
-                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                              <span>Exporting...</span>
-                            </>
-                          ) : (
-                            <>
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-4 w-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor">
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                />
-                              </svg>
-                              <span>Export Data</span>
-                              {filteredCampaigns.length > 0 && (
-                                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                                  {filteredCampaigns.length}
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </button>
+                        {/* <div className="flex gap-2">
+                      
+                          <button
+                            onClick={handleForceRefresh}
+                            disabled={loading || !selectedAccount}
+                            className="flex items-center gap-2"
+                            title="Force refresh data (bypasses 12-hour cache)">
+                            <RefreshCw
+                              className={`h-4 w-4 ${
+                                loading ? "animate-spin" : ""
+                              }`}
+                            />
+                            Refresh
+                          </button>
+                        </div> */}
                       </div>
 
                       {/* 🔥 NEW: Pagination Info */}
-                      <div className="px-6 py-3 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-t-lg">
+                      <div className="px-6 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-t-lg">
                         <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-                          <span>
+                          <span className="py-3">
                             Showing {paginationData.startIndex + 1} to{" "}
                             {paginationData.endIndex} of{" "}
                             {paginationData.totalItems} campaigns
                           </span>
-                          <span>
-                            Page {currentPage} of {paginationData.totalPages}
-                          </span>
+                          <div className="flex gap-3">
+                            <span className="py-3">
+                              Page {currentPage} of {paginationData.totalPages}
+                            </span>
+                            <button
+                              onClick={() => dispatch(openExportModal())}
+                              disabled={
+                                loading || filteredCampaigns.length === 0
+                              }
+                              className="hover:text-white hover:bg-slate-400 flex items-center gap-2 px-2 py-3 shadow-sm shadow-slate-300">
+                              <Download className="h-4 w-4" />
+                              Export Data ({filteredCampaigns.length})
+                            </button>
+                          </div>
                         </div>
                       </div>
 
@@ -1553,13 +1864,40 @@ const AdvanceAnalyticsPage: React.FC = () => {
                                     </td>
 
                                     {/* Category */}
-                                    <td className="px-4 py-4">
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      {" "}
                                       <span
-                                        className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getCategoryBadgeColor(
-                                          campaign.verdict?.category
-                                        )}`}>
-                                        {campaign.verdict?.category || "N/A"}
-                                      </span>
+                                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${(() => {
+                                          const verdict =
+                                            campaign.ai_verdict ||
+                                            campaign.verdict?.category ||
+                                            "Not Analyzed";
+                                          if (verdict.includes("Excellent"))
+                                            return "bg-green-100 text-green-800";
+                                          if (
+                                            verdict.includes("Good") ||
+                                            verdict.includes("Stable")
+                                          )
+                                            return "bg-blue-100 text-blue-800";
+                                          if (
+                                            verdict.includes("Average") ||
+                                            verdict.includes("Moderate")
+                                          )
+                                            return "bg-yellow-100 text-yellow-800";
+                                          if (
+                                            verdict.includes("Needs") ||
+                                            verdict.includes("Underperforming")
+                                          )
+                                            return "bg-orange-100 text-orange-800";
+                                          if (verdict.includes("Poor"))
+                                            return "bg-red-100 text-red-800";
+                                          return "bg-gray-100 text-gray-800";
+                                        })()}`}>
+                                        {" "}
+                                        {campaign.ai_verdict ||
+                                          campaign.verdict?.category ||
+                                          "Not Analyzed"}{" "}
+                                      </span>{" "}
                                     </td>
 
                                     {/* Impressions */}
@@ -1775,7 +2113,6 @@ const AdvanceAnalyticsPage: React.FC = () => {
               isOpen={showCampaignDetails}
               onClose={handleCloseCampaignDetails}
               campaign={selectedCampaign}
-              category={selectedCategory}
             />
             <ExportOptionsModal
               isOpen={exportModal.isOpen}

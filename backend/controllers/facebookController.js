@@ -192,10 +192,10 @@ const handleFacebookCallback = async (req, res) => {
 const getFacebookStatus = async (req, res) => {
   try {
     const userUuid = req.user.uuid; // Use UUID
-    console.log(`🔍 Getting Facebook status for user: ${userUuid}`);
+    // console.log(`🔍 Getting Facebook status for user: ${userUuid}`);
 
     const statusData = await getUserFacebookStatus(userUuid);
-    console.log("🔍 Status data:", statusData);
+    // console.log("🔍 Status data:", statusData);
 
     if (!statusData) {
       return res.status(404).json({
@@ -207,7 +207,7 @@ const getFacebookStatus = async (req, res) => {
     // 🔥 NEW: Get token expiry from primary_connection data (no need to query users table)
     if (statusData.facebook_connected && statusData.facebook_token_valid && statusData.primary_connection) {
       const primaryConnection = statusData.primary_connection;
-      console.log("🔍 Primary connection found:", primaryConnection);
+      // console.log("🔍 Primary connection found:", primaryConnection);
 
       const tokenUpdatedAt = new Date(primaryConnection.fb_token_updated_at);
       const expiresAt = new Date(tokenUpdatedAt.getTime() + (primaryConnection.fb_token_expires_in * 1000));
@@ -216,11 +216,11 @@ const getFacebookStatus = async (req, res) => {
       statusData.token_expires_in_days = daysUntilExpiry;
       statusData.token_expires_at = expiresAt;
 
-      console.log("✅ Token expiry calculated:", {
-        tokenUpdatedAt,
-        expiresAt,
-        daysUntilExpiry
-      });
+      // console.log("✅ Token expiry calculated:", {
+      //   tokenUpdatedAt,
+      //   expiresAt,
+      //   daysUntilExpiry
+      // });
     }
 
     return res.status(200).json({
